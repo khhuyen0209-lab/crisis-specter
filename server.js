@@ -336,10 +336,6 @@ room
 
 
 
-sendRoom(room);
-
-
-
 }
 catch(e){
 
@@ -1025,7 +1021,7 @@ message:"WebSocket online"
 });
 
 
-ws.on("message",(msg)=>{
+ws.on("message", async (msg)=>{
 
 try{
 
@@ -1034,14 +1030,14 @@ let data = JSON.parse(msg);
 
 if(data.type==="join"){
 
-ws.room=data.room;
+    ws.room = data.room;
 
+    send(ws,{
+        type:"joined",
+        room:data.room
+    });
 
-send(ws,{
-type:"joined",
-room:data.room
-});
-
+    await sendRoom(data.room);
 
 }
 
