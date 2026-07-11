@@ -154,7 +154,6 @@ function randomRoom(){
 
 async function sendRoom(room){
 
-
     const ref =
     db.collection("rooms")
     .doc(room);
@@ -177,7 +176,8 @@ async function sendRoom(room){
 
 
     const players =
-    await ref.collection("players")
+    await ref
+    .collection("players")
     .get();
 
 
@@ -188,7 +188,6 @@ async function sendRoom(room){
 
     players.forEach(p=>{
 
-
         list.push({
 
             id:p.id,
@@ -196,7 +195,6 @@ async function sendRoom(room){
             ...p.data()
 
         });
-
 
     });
 
@@ -208,16 +206,33 @@ async function sendRoom(room){
 
         room,
 
+
+        // chủ phòng
+
+        host:data.host,
+
+
+        // trạng thái phòng
+
         locked:data.locked,
 
         maxPlayers:data.maxPlayers,
 
+        status:data.status,
+
+        lastActive:data.lastActive,
+
+
+        // người chơi
+
         players:list
+
 
     });
 
 
 }
+
 
 
 
@@ -355,7 +370,9 @@ await ref.collection("players")
 
     seat:0,
 
-    ready:true
+    ready:true,
+
+    lastSeen:Date.now()
 
 });
 
@@ -524,7 +541,9 @@ await ref.collection("players")
 
     seat,
 
-    ready:false
+    ready:false,
+
+    lastSeen:Date.now()
 
 });
 
@@ -713,11 +732,10 @@ await roomRef
 
 if(players.empty){
 
-
-await roomRef.delete();
-
+await transferHostWhenLeave(room,uid);
 
 }
+
 else{
 
 
@@ -764,6 +782,329 @@ res.status(500).json({
 
 
 
+// =====================
+// KICK PLAYER
+// =====================
+
+app.post("/room/kick", async(req,res)=>{
+
+try{
+
+
+const {
+host,
+target,
+room
+}=req.body;
+
+
+
+const roomRef =
+db.collection("rooms")
+.doc(room);
+
+
+
+const snap =
+await roomRef.get();
+
+
+
+if(!snap.exists){
+
+return res.json({
+
+ok:false,
+
+error:"Phòng không tồn tại"
+
+});
+
+}
+
+
+
+const data =
+snap.data();
+
+
+
+if(data.host !== host){
+
+return res.json({
+
+ok:false,
+
+error:"Bạn không phải chủ phòng"
+
+});
+
+}
+
+
+
+if(target === host){
+
+return res.json({
+
+ok:false,
+
+error:"Không thể đá chính mình"
+
+});
+
+}
+
+
+
+await roomRef
+.collection("players")
+.doc(target)
+.delete();
+
+
+
+await roomRef.update({
+
+lastActive:Date.now()
+
+});
+
+
+
+await sendRoom(room);
+
+
+
+res.json({
+
+ok:true
+
+});
+
+
+
+}
+catch(e){
+
+res.status(500).json({
+
+ok:false,
+
+error:e.message
+
+});
+
+}
+
+});
+
+
+
+
+
+// =====================
+// TRANSFER HOST
+// =====================
+
+app.post("/room/transfer", async(req,res)=>{
+
+try{
+
+
+const {
+host,
+target,
+room
+}=req.body;
+
+
+
+const roomRef =
+db.collection("rooms")
+.doc(room);
+
+
+
+const snap =
+await roomRef.get();
+
+
+
+if(!snap.exists){
+
+return res.json({
+
+ok:false,
+
+error:"Phòng không tồn tại"
+
+});
+
+}
+
+
+
+const data =
+snap.data();
+
+
+
+if(data.host !== host){
+
+return res.json({
+
+ok:false,
+
+error:"Bạn không phải chủ phòng"
+
+});
+
+}
+
+
+
+const targetPlayer =
+await roomRef
+.collection("players")
+.doc(target)
+.get();
+
+
+
+if(!targetPlayer.exists){
+
+return res.json({
+
+ok:false,
+
+error:"Người chơi không có trong phòng"
+
+});
+
+}
+
+
+
+await roomRef.update({
+
+host:target,
+
+lastActive:Date.now()
+
+});
+
+
+
+await sendRoom(room);
+
+
+
+res.json({
+
+ok:true
+
+});
+
+
+}
+catch(e){
+
+res.status(500).json({
+
+ok:false,
+
+error:e.message
+
+});
+
+}
+
+});
+
+
+
+
+
+// =====================
+// AUTO TRANSFER WHEN HOST LEAVE
+// =====================
+
+async function transferHostWhenLeave(room,uid){
+
+
+const roomRef =
+db.collection("rooms")
+.doc(room);
+
+
+
+const snap =
+await roomRef.get();
+
+
+
+if(!snap.exists)
+return;
+
+
+
+const data =
+snap.data();
+
+
+
+if(data.host !== uid)
+return;
+
+
+
+const players =
+await roomRef
+.collection("players")
+.get();
+
+
+
+let newHost=null;
+
+
+
+players.forEach(p=>{
+
+if(!newHost){
+
+newHost=p.id;
+
+}
+
+});
+
+
+
+if(newHost){
+
+
+await roomRef.update({
+
+host:newHost,
+
+lastActive:Date.now()
+
+});
+
+
+}
+else{
+
+
+await roomRef.delete();
+
+
+}
+
+
+}
 
 
 
@@ -1091,7 +1432,30 @@ await sendRoom(data.room);
 
 
 
+if(data.type==="ping"){
 
+const ref =
+db.collection("rooms")
+.doc(data.room)
+.collection("players")
+.doc(data.uid);
+
+
+const snap =
+await ref.get();
+
+
+if(snap.exists){
+
+await ref.update({
+
+lastSeen:Date.now()
+
+});
+
+}
+
+}
 
 
 
@@ -1161,3 +1525,66 @@ c=>c!==ws
 
 
 });
+
+async function checkOffline(){
+
+const now = Date.now();
+
+
+const rooms =
+await db.collection("rooms").get();
+
+
+
+for(const room of rooms.docs){
+
+
+const players =
+await room.ref
+.collection("players")
+.get();
+
+
+
+for(const p of players.docs){
+
+
+const data =
+p.data();
+
+
+
+if(
+data.lastSeen &&
+now - data.lastSeen > 120000
+){
+
+await p.ref.delete();
+
+await transferHostWhenLeave(
+room.id,
+p.id
+);
+
+console.log(
+"Kick offline:",
+p.id
+);
+
+}
+
+}
+
+
+await sendRoom(room.id);
+
+}
+
+
+}
+
+setInterval(()=>{
+
+checkOffline();
+
+},30000);
