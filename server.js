@@ -1,4 +1,4 @@
-// server.js P1/3
+// server.js P1/2
 
 import express from "express";
 import cors from "cors";
@@ -8,893 +8,125 @@ import { WebSocketServer } from "ws";
 
 dotenv.config();
 
+
 // =====================
 // FIREBASE
 // =====================
 
 admin.initializeApp({
 
-credential: admin.credential.cert({  
+    credential: admin.credential.cert({
 
-    projectId:  
-    process.env.FIREBASE_PROJECT_ID,  
+        projectId:
+        process.env.FIREBASE_PROJECT_ID,
 
-    clientEmail:  
-    process.env.FIREBASE_CLIENT_EMAIL,  
+        clientEmail:
+        process.env.FIREBASE_CLIENT_EMAIL,
 
-    privateKey:  
-    process.env.FIREBASE_PRIVATE_KEY  
-    .replace(/\\n/g,"\n")  
+        privateKey:
+        process.env.FIREBASE_PRIVATE_KEY
+        .replace(/\\n/g,"\n")
 
-})
+    })
 
 });
 
-const db =
-admin.firestore();
+
+const db = admin.firestore();
+
+
+
 
 // =====================
 // EXPRESS
 // =====================
 
-const app =
-express();
+const app = express();
+
 
 app.use(cors());
 
 app.use(express.json());
 
+
 const PORT =
 process.env.PORT || 8080;
 
+
+
 app.get("/",(req,res)=>{
 
-res.json({  
+    res.json({
 
-    status:"online",  
+        status:"online",
 
-    game:"Werewolf Online Server",  
+        game:"Werewolf Online Server",
 
-    version:"V2"  
+        version:"V2"
+
+    });
 
 });
 
-});
+
+
+
 
 // =====================
 // WEBSOCKET
 // =====================
 
-let clients=[];
+let clients = [];
+
+
 
 function send(ws,data){
 
-if(  
-    ws.readyState === 1  
-){  
+    if(ws.readyState === 1){
 
-    ws.send(  
-        JSON.stringify(data)  
-    );  
+        ws.send(
+            JSON.stringify(data)
+        );
 
-}
+    }
 
 }
+
+
 
 function broadcast(room,data){
 
-clients.forEach(ws=>{  
+    clients.forEach(ws=>{
 
-    if(  
-        ws.room === room &&  
-        ws.readyState === 1  
-    ){  
+        if(
+            ws.room === room &&
+            ws.readyState === 1
+        ){
 
-        send(ws,data);  
+            send(ws,data);
 
-    }  
+        }
 
-});
-
-}
-
-// =====================
-// ROOM SYNC
-// =====================
-
-async function sendRoom(room){
-
-const roomRef =  
-db.collection("rooms")  
-.doc(room);  
-
-
-
-const snap =  
-await roomRef.get();  
-
-
-
-if(!snap.exists)  
-return;  
-
-
-
-const roomData =  
-snap.data();  
-
-
-
-
-const playersSnap =  
-await roomRef  
-.collection("players")  
-.get();  
-
-
-
-let players=[];  
-
-
-
-playersSnap.forEach(p=>{  
-
-
-    players.push({  
-
-        id:p.id,  
-
-        ...p.data()  
-
-    });  
-
-
-});  
-
-
-
-
-
-
-const packet={  
-
-
-    type:"room",  
-
-    room,  
-
-    locked:  
-    roomData.locked,  
-
-
-    maxPlayers:  
-    roomData.maxPlayers,  
-
-
-    players  
-
-
-};  
-
-
-
-
-broadcast(  
-    room,  
-    packet  
-);
+    });
 
 }
-
-// =====================
-// ROOM CODE
-// =====================
-
-function randomRoom(){
-
-const chars =  
-"ABCDEFGH123456789";  
-
-
-
-let code="";  
-
-
-
-for(  
-    let i=0;  
-    i<4;  
-    i++  
-){  
-
-    code +=  
-    chars[  
-        Math.floor(  
-            Math.random() *  
-            chars.length  
-        )  
-    ];  
-
-}  
-
-
-
-return code;
-
-}
-
-// =====================
-// START SERVER
-// =====================
-
-const server =
-app.listen(PORT,()=>{
-
-console.log(  
-    "🚀 Server running:",  
-    PORT  
-);
-
-});
-
-const wss =
-new WebSocketServer({
-
-server
-
-});
-
-console.log(
-"🐺 Werewolf Server Ready"
-);
-// =====================
-// CREATE ROOM
-// =====================
-
-app.post(
-"/room/create",
-async(req,res)=>{
-
-try{
-
-const {
-
-uid,
-
-maxPlayers,
-
-locked
-
-}=req.body;
-
-let room;
-
-while(true){
-
-room=randomRoom();
-
-const check =
-await db.collection("rooms")
-.doc(room)
-.get();
-
-if(!check.exists)
-break;
-
-}
-
-const ref =
-db.collection("rooms")
-.doc(room);
-
-await ref.set({
-
-host:uid,
-
-maxPlayers:
-maxPlayers || 8,
-
-locked:
-locked || false,
-
-status:"waiting",
-
-createdAt:Date.now(),
-
-lastActive:Date.now()
-
-});
-
-// thêm chủ phòng
-
-await ref.collection("players")
-.doc(uid)
-.set({
-
-name:"Player",
-
-avatar:"👑",
-
-seat:0,
-
-ready:true
-
-});
-
-// đồng bộ ngay
-
-await sendRoom(room);
-
-res.json({
-
-ok:true,
-
-room
-
-});
-
-}
-catch(e){
-
-res.status(500).json({
-
-ok:false,
-
-error:e.message
-
-});
-
-}
-
-});
-
-// =====================
-// JOIN ROOM
-// =====================
-
-app.post(
-"/room/join",
-async(req,res)=>{
-
-try{
-
-const {
-
-uid,
-
-room
-
-}=req.body;
-
-const ref =
-db.collection("rooms")
-.doc(room);
-
-const snap =
-await ref.get();
-
-if(!snap.exists){
-
-return res.json({
-
-ok:false,
-
-error:"Không tồn tại phòng"
-
-});
-
-}
-
-const data =
-snap.data();
-
-if(data.locked){
-
-return res.json({
-
-ok:false,
-
-error:"Phòng khóa"
-
-});
-
-}
-
-const players =
-await ref.collection("players")
-.get();
-
-if(
-players.size >= data.maxPlayers
-){
-
-return res.json({
-
-ok:false,
-
-error:"Phòng đầy"
-
-});
-
-}
-
-let seat=0;
-
-let used=[];
-
-players.forEach(p=>{
-
-used.push(
-p.data().seat
-);
-
-});
-
-while(
-used.includes(seat)
-){
-
-seat++;
-
-}
-
-await ref.collection("players")
-.doc(uid)
-.set({
-
-name:"Player "+(seat+1),
-
-avatar:"🙂",
-
-seat,
-
-ready:false
-
-});
-
-await ref.update({
-
-lastActive:Date.now()
-
-});
-
-await sendRoom(room);
-
-res.json({
-
-ok:true
-
-});
-
-}
-catch(e){
-
-res.status(500).json({
-
-ok:false,
-
-error:e.message
-
-});
-
-}
-
-});
-
-// =====================
-// READY
-// =====================
-
-app.post(
-"/room/ready",
-async(req,res)=>{
-
-try{
-
-const {
-
-uid,
-
-room
-
-}=req.body;
-
-const ref =
-db.collection("rooms")
-.doc(room)
-.collection("players")
-.doc(uid);
-
-const snap =
-await ref.get();
-
-if(!snap.exists){
-
-return res.json({
-
-ok:false,
-
-error:"Không có người chơi"
-
-});
-
-}
-
-await ref.update({
-
-ready:
-!snap.data().ready
-
-});
-
-await sendRoom(room);
-
-res.json({
-
-ok:true
-
-});
-
-}
-catch(e){
-
-res.status(500).json({
-
-ok:false,
-
-error:e.message
-
-});
-
-}
-
-});
-
-// =====================
-// LEAVE ROOM
-// =====================
-
-app.post(
-"/room/leave",
-async(req,res)=>{
-
-try{
-
-const {
-
-uid,
-
-room
-
-}=req.body;
-
-const roomRef =
-db.collection("rooms")
-.doc(room);
-
-await roomRef
-.collection("players")
-.doc(uid)
-.delete();
-
-const players =
-await roomRef
-.collection("players")
-.get();
-
-if(players.empty){
-
-await roomRef.delete();
-
-}
-else{
-
-await roomRef.update({
-
-lastActive:Date.now()
-
-});
-
-await sendRoom(room);
-
-}
-
-res.json({
-
-ok:true
-
-});
-
-}
-catch(e){
-
-res.status(500).json({
-
-ok:false,
-
-error:e.message
-
-});
-
-}
-
-});
-// =====================
-// QUICK JOIN
-// =====================
-
-app.get(
-"/room/quick",
-async(req,res)=>{
-
-try{
-
-const rooms =
-await db.collection("rooms")
-.where(
-"status",
-"==",
-"waiting"
-)
-.get();
-
-let found=null;
-
-for(const r of rooms.docs){
-
-const data =
-r.data();
-
-if(data.locked)
-continue;
-
-const players =
-await r.ref
-.collection("players")
-.get();
-
-if(
-players.size < data.maxPlayers
-){
-
-found=r.id;
-
-break;
-
-}
-
-}
-
-res.json({
-
-room:found
-
-});
-
-}
-catch(e){
-
-res.status(500).json({
-
-error:e.message
-
-});
-
-}
-
-});
-
-// =====================
-// CHAT HISTORY
-// =====================
-
-app.get(
-"/room/:id/chat",
-async(req,res)=>{
-
-try{
-
-const snap =
-await db.collection("rooms")
-.doc(req.params.id)
-.collection("chat")
-.orderBy("time","asc")
-.limit(100)
-.get();
-
-let list=[];
-
-snap.forEach(x=>{
-
-list.push(
-x.data()
-);
-
-});
-
-res.json(list);
-
-}
-catch(e){
-
-res.status(500).json({
-
-error:e.message
-
-});
-
-}
-
-});
-
-// =====================
-// AUTO DELETE ROOM
-// =====================
-
-setInterval(async()=>{
-
-try{
-
-const now =
-Date.now();
-
-const rooms =
-await db.collection("rooms")
-.get();
-
-for(const room of rooms.docs){
-
-const data =
-room.data();
-
-const players =
-await room.ref
-.collection("players")
-.get();
-
-if(
-
-players.empty &&
-
-now - data.lastActive >
-15 * 60 * 1000
-
-){
-
-await room.ref.delete();
-
-console.log(
-"🗑 Deleted:",
-room.id
-);
-
-}
-
-}
-
-}
-catch(e){
-
-console.log(
-"Auto delete:",
-e.message
-);
-
-}
-
-},60000);
-
-// =====================
-// WEBSOCKET MESSAGE
-// =====================
-
-wss.on("connection",(ws)=>{
-
-console.log(
-"🔌 WebSocket connected"
-);
-
-clients.push(ws);
-
-send(ws,{
-
-type:"connected",
-
-message:"WebSocket online"
-
-});
-
-ws.on("message",async(msg)=>{
-
-try{
-
-const data =
-JSON.parse(msg);
-
-// client vào phòng
-
-if(
-data.type==="join"
-){
-
-ws.room =
-data.room;
-
-send(ws,{
-
-type:"joined",
-
-room:data.room
-
-});
-
-// gửi lại phòng
-
-await sendRoom(data.room);
-
-}
-
-// chat
-
-if(
-data.type==="chat"
-){
-
-broadcast(
-data.room,
-{
-
-type:"chat",
-
-name:data.uid,
-
-text:data.text
-
-}
-
-);
-
-}
-
-}
-catch(e){
-
-console.log(
-"WS Error:",
-e.message
-);
-
-}
-
-});
-
-ws.on("close",()=>{
-
-clients =
-clients.filter(
-c=>c!==ws
-);
-
-});
-
-});
 
 
 
 
 
 // =====================
-// UTILS
+// ROOM UTILS
 // =====================
 
 
 function randomRoom(){
 
-    let chars=
+    const chars =
     "ABCDEFGH123456789";
 
 
-    let code="";
+    let code = "";
 
 
     for(
@@ -923,13 +155,13 @@ function randomRoom(){
 async function sendRoom(room){
 
 
-    let ref =
+    const ref =
     db.collection("rooms")
     .doc(room);
 
 
 
-    let snap =
+    const snap =
     await ref.get();
 
 
@@ -939,22 +171,23 @@ async function sendRoom(room){
 
 
 
-    let data =
+    const data =
     snap.data();
 
 
 
-    let players =
+    const players =
     await ref.collection("players")
     .get();
 
 
 
-    let list=[];
+    let list = [];
 
 
 
     players.forEach(p=>{
+
 
         list.push({
 
@@ -963,6 +196,7 @@ async function sendRoom(room){
             ...p.data()
 
         });
+
 
     });
 
@@ -989,6 +223,44 @@ async function sendRoom(room){
 
 
 
+// =====================
+// START SERVER
+// =====================
+
+
+const server =
+app.listen(PORT,()=>{
+
+
+    console.log(
+        "🚀 Server running on port",
+        PORT
+    );
+
+
+});
+
+
+
+
+
+const wss =
+new WebSocketServer({
+
+    server
+
+});
+
+
+
+
+
+console.log(
+    "🐺 Werewolf Server Ready"
+);
+
+
+
 
 
 // =====================
@@ -1004,7 +276,7 @@ async(req,res)=>{
 try{
 
 
-let {
+const {
 
 uid,
 
@@ -1019,33 +291,31 @@ locked
 let room;
 
 
-do{
+
+while(true){
 
 
-room=randomRoom();
-
-
-
-let check =
-await db.collection("rooms")
-.doc(room)
-.get();
+    room = randomRoom();
 
 
 
-if(!check.exists)
-break;
+    const check =
+    await db.collection("rooms")
+    .doc(room)
+    .get();
 
+
+
+    if(!check.exists)
+    break;
 
 
 }
-while(true);
 
 
 
 
-
-let ref =
+const ref =
 db.collection("rooms")
 .doc(room);
 
@@ -1055,22 +325,21 @@ db.collection("rooms")
 
 await ref.set({
 
-host:uid,
+    host:uid,
 
-maxPlayers:
-maxPlayers || 8,
+    maxPlayers:
+    maxPlayers || 8,
 
-locked:
-locked || false,
+    locked:
+    locked || false,
 
-status:"waiting",
+    status:"waiting",
 
-createdAt:Date.now(),
+    createdAt:Date.now(),
 
-lastActive:Date.now()
+    lastActive:Date.now()
 
 });
-
 
 
 
@@ -1080,13 +349,13 @@ await ref.collection("players")
 .doc(uid)
 .set({
 
-name:"Player",
+    name:"Player",
 
-avatar:"👑",
+    avatar:"👑",
 
-seat:0,
+    seat:0,
 
-ready:true
+    ready:true
 
 });
 
@@ -1094,11 +363,15 @@ ready:true
 
 
 
+await sendRoom(room);
+
+
+
 res.json({
 
-ok:true,
+    ok:true,
 
-room
+    room
 
 });
 
@@ -1108,12 +381,11 @@ room
 catch(e){
 
 
-res.status(500)
-.json({
+res.status(500).json({
 
-ok:false,
+    ok:false,
 
-error:e.message
+    error:e.message
 
 });
 
@@ -1121,10 +393,7 @@ error:e.message
 }
 
 
-
 });
-
-
 
 
 
@@ -1144,7 +413,7 @@ async(req,res)=>{
 try{
 
 
-let {
+const {
 
 uid,
 
@@ -1154,13 +423,13 @@ room
 
 
 
-let ref =
+const ref =
 db.collection("rooms")
 .doc(room);
 
 
 
-let snap =
+const snap =
 await ref.get();
 
 
@@ -1169,9 +438,9 @@ if(!snap.exists){
 
 return res.json({
 
-ok:false,
+    ok:false,
 
-error:"Không tồn tại phòng"
+    error:"Không tồn tại phòng"
 
 });
 
@@ -1179,9 +448,7 @@ error:"Không tồn tại phòng"
 
 
 
-
-
-let data =
+const data =
 snap.data();
 
 
@@ -1191,9 +458,9 @@ if(data.locked){
 
 return res.json({
 
-ok:false,
+    ok:false,
 
-error:"Phòng khóa"
+    error:"Phòng khóa"
 
 });
 
@@ -1201,24 +468,19 @@ error:"Phòng khóa"
 
 
 
-
-
-let players =
+const players =
 await ref.collection("players")
 .get();
 
 
 
-
-if(
-players.size >= data.maxPlayers
-){
+if(players.size >= data.maxPlayers){
 
 return res.json({
 
-ok:false,
+    ok:false,
 
-error:"Phòng đầy"
+    error:"Phòng đầy"
 
 });
 
@@ -1226,20 +488,17 @@ error:"Phòng đầy"
 
 
 
+let seat = 0;
 
-
-let seat=0;
-
-
-let used=[];
+let used = [];
 
 
 
 players.forEach(p=>{
 
-used.push(
-p.data().seat
-);
+    used.push(
+        p.data().seat
+    );
 
 });
 
@@ -1249,11 +508,9 @@ while(
 used.includes(seat)
 ){
 
-seat++;
+    seat++;
 
 }
-
-
 
 
 
@@ -1261,39 +518,35 @@ await ref.collection("players")
 .doc(uid)
 .set({
 
-name:"Player "+(seat+1),
+    name:"Player "+(seat+1),
 
-avatar:"🙂",
+    avatar:"🙂",
 
-seat,
+    seat,
 
-ready:false
+    ready:false
 
 });
-
-
 
 
 
 await ref.update({
 
-lastActive:Date.now()
+    lastActive:Date.now()
 
 });
 
 
+
+await sendRoom(room);
 
 
 
 res.json({
 
-ok:true
+    ok:true
 
 });
-
-
-
-sendRoom(room);
 
 
 
@@ -1301,11 +554,11 @@ sendRoom(room);
 catch(e){
 
 
-res.json({
+res.status(500).json({
 
-ok:false,
+    ok:false,
 
-error:e.message
+    error:e.message
 
 });
 
@@ -1313,103 +566,30 @@ error:e.message
 }
 
 
-
 });
-
-
-
-
-
-
+// server.js P2/2
 
 
 // =====================
 // READY
 // =====================
-
 
 app.post(
 "/room/ready",
 async(req,res)=>{
 
 
-let {
-
-uid,
-
-room
-
-}=req.body;
-
-
-
-
-let ref =
-db.collection("rooms")
-.doc(room)
-.collection("players")
-.doc(uid);
-
-
-
-
-let snap =
-await ref.get();
-
-
-
-
-if(!snap.exists){
-
-return res.json({
-
-ok:false
-
-});
-
-}
-
-
-
-
-await ref.update({
-
-ready:
-!snap.data().ready
-
-});
-
-
-
-
-
-res.json({
-
-ok:true
-
-});
-
-
-
-
-sendRoom(room);
-
-
-
-});
-
-// =====================
-// READY
-// =====================
-
-app.post("/room/ready", async(req,res)=>{
-
 try{
 
+
 const {
+
 uid,
+
 room
+
 }=req.body;
+
 
 
 const ref =
@@ -1419,46 +599,68 @@ db.collection("rooms")
 .doc(uid);
 
 
+
+
 const snap =
 await ref.get();
+
 
 
 if(!snap.exists){
 
 return res.json({
-ok:false,
-error:"Không tìm thấy người chơi"
+
+    ok:false,
+
+    error:"Không tìm thấy người chơi"
+
 });
 
 }
 
 
+
 await ref.update({
 
-ready:
-!snap.data().ready
+    ready:
+    !snap.data().ready
 
 });
 
-
-res.json({
-ok:true
-});
 
 
 await sendRoom(room);
 
 
-}catch(e){
+
+res.json({
+
+    ok:true
+
+});
+
+
+
+}
+catch(e){
+
 
 res.status(500).json({
-ok:false,
-error:e.message
+
+    ok:false,
+
+    error:e.message
+
 });
+
 
 }
 
+
 });
+
+
+
 
 
 
@@ -1467,21 +669,29 @@ error:e.message
 // LEAVE ROOM
 // =====================
 
-app.post("/room/leave", async(req,res)=>{
+app.post(
+"/room/leave",
+async(req,res)=>{
+
 
 try{
 
 
 const {
+
 uid,
+
 room
+
 }=req.body;
+
 
 
 
 const roomRef =
 db.collection("rooms")
 .doc(room);
+
 
 
 
@@ -1492,6 +702,7 @@ await roomRef
 
 
 
+
 const players =
 await roomRef
 .collection("players")
@@ -1499,45 +710,60 @@ await roomRef
 
 
 
+
 if(players.empty){
+
 
 await roomRef.delete();
 
 
-}else{
+}
+else{
 
 
 await roomRef.update({
 
-lastActive:Date.now()
+    lastActive:Date.now()
 
 });
 
 
 await sendRoom(room);
 
+
 }
 
 
 
 res.json({
-ok:true
+
+    ok:true
+
 });
 
 
 
-}catch(e){
+}
+catch(e){
+
 
 res.status(500).json({
 
-ok:false,
-error:e.message
+    ok:false,
+
+    error:e.message
 
 });
+
 
 }
 
+
 });
+
+
+
+
 
 
 
@@ -1546,7 +772,9 @@ error:e.message
 // QUICK JOIN
 // =====================
 
-app.get("/room/quick", async(req,res)=>{
+app.get(
+"/room/quick",
+async(req,res)=>{
 
 
 try{
@@ -1563,7 +791,9 @@ await db.collection("rooms")
 
 
 
-let found=null;
+
+let found = null;
+
 
 
 
@@ -1589,9 +819,11 @@ await r.ref
 
 if(players.size < data.maxPlayers){
 
-found=r.id;
+
+found = r.id;
 
 break;
+
 
 }
 
@@ -1602,18 +834,19 @@ break;
 
 res.json({
 
-room:found
+    room:found
 
 });
 
 
 
-}catch(e){
+}
+catch(e){
 
 
 res.status(500).json({
 
-error:e.message
+    error:e.message
 
 });
 
@@ -1627,11 +860,16 @@ error:e.message
 
 
 
+
+
+
 // =====================
 // CHAT HISTORY
 // =====================
 
-app.get("/room/:id/chat", async(req,res)=>{
+app.get(
+"/room/:id/chat",
+async(req,res)=>{
 
 
 try{
@@ -1650,9 +888,14 @@ await db.collection("rooms")
 let list=[];
 
 
+
 snap.forEach(x=>{
 
-list.push(x.data());
+
+list.push(
+x.data()
+);
+
 
 });
 
@@ -1662,13 +905,16 @@ res.json(list);
 
 
 
-}catch(e){
+}
+catch(e){
+
 
 res.status(500).json({
 
-error:e.message
+    error:e.message
 
 });
+
 
 }
 
@@ -1679,12 +925,16 @@ error:e.message
 
 
 
+
+
 // =====================
 // AUTO DELETE ROOM
 // =====================
 
-
 setInterval(async()=>{
+
+
+try{
 
 
 const now =
@@ -1695,6 +945,7 @@ Date.now();
 const rooms =
 await db.collection("rooms")
 .get();
+
 
 
 
@@ -1713,12 +964,13 @@ await room.ref
 
 
 
+
 if(
 
 players.empty &&
 
-now-data.lastActive >
-15*60*1000
+now - data.lastActive >
+15 * 60 * 1000
 
 ){
 
@@ -1726,17 +978,38 @@ now-data.lastActive >
 await room.ref.delete();
 
 
+
 console.log(
-"Deleted room:",
+
+"🗑 Deleted room:",
+
 room.id
+
 );
 
 
 }
 
 
+
 }
 
+
+
+}
+catch(e){
+
+
+console.log(
+
+"Auto delete error:",
+
+e.message
+
+);
+
+
+}
 
 
 },60000);
@@ -1744,110 +1017,147 @@ room.id
 
 
 
-// =====================
-// START MESSAGE
-// =====================
 
-console.log(
-"🐺 Werewolf Server Ready"
-);
 
-// =====================
-// START SERVER
-// =====================
-
-const server = app.listen(PORT,()=>{
-
-console.log(
-"🚀 Server running on port",
-PORT
-);
-
-});
 
 
 // =====================
-// WEBSOCKET
+// WEBSOCKET MESSAGE
 // =====================
-
-const wss = new WebSocketServer({
-server
-});
 
 
 wss.on("connection",(ws)=>{
 
-console.log("🔌 WebSocket connected");
+
+console.log(
+"🔌 WebSocket connected"
+);
+
 
 
 clients.push(ws);
 
 
+
+
 send(ws,{
-type:"connected",
-message:"WebSocket online"
+
+    type:"connected",
+
+    message:"WebSocket online"
+
 });
 
 
-ws.on("message", async (msg)=>{
+
+
+
+ws.on("message",async(msg)=>{
+
 
 try{
 
-let data = JSON.parse(msg);
+
+const data =
+JSON.parse(msg);
+
+
+
 
 
 if(data.type==="join"){
 
-    ws.room = data.room;
 
-    send(ws,{
-        type:"joined",
-        room:data.room
-    });
+ws.room =
+data.room;
 
-    await sendRoom(data.room);
+
+
+send(ws,{
+
+    type:"joined",
+
+    room:data.room
+
+});
+
+
+
+await sendRoom(data.room);
+
+
 
 }
+
+
+
+
+
 
 
 if(data.type==="chat"){
 
-broadcast(data.room,{
 
-type:"chat",
+broadcast(
 
-name:data.uid,
+data.room,
 
-text:data.text
+{
 
-});
+    type:"chat",
 
+    name:data.uid,
+
+    text:data.text
 
 }
 
-
-}catch(e){
-
-console.log(
-"WS Error:",
-e.message
 );
 
+
 }
 
 
+
+
+}
+catch(e){
+
+
+console.log(
+
+"WS Error:",
+
+e.message
+
+);
+
+
+}
+
+
+
 });
+
+
+
+
 
 
 
 ws.on("close",()=>{
 
+
 clients =
 clients.filter(
+
 c=>c!==ws
+
 );
 
+
 });
+
 
 
 });
