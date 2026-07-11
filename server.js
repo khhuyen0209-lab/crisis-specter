@@ -987,3 +987,103 @@ room.id
 console.log(
 "🐺 Werewolf Server Ready"
 );
+
+// =====================
+// START SERVER
+// =====================
+
+const server = app.listen(PORT,()=>{
+
+console.log(
+"🚀 Server running on port",
+PORT
+);
+
+});
+
+
+// =====================
+// WEBSOCKET
+// =====================
+
+const wss = new WebSocketServer({
+server
+});
+
+
+wss.on("connection",(ws)=>{
+
+console.log("🔌 WebSocket connected");
+
+
+clients.push(ws);
+
+
+send(ws,{
+type:"connected",
+message:"WebSocket online"
+});
+
+
+ws.on("message",(msg)=>{
+
+try{
+
+let data = JSON.parse(msg);
+
+
+if(data.type==="join"){
+
+ws.room=data.room;
+
+
+send(ws,{
+type:"joined",
+room:data.room
+});
+
+
+}
+
+
+if(data.type==="chat"){
+
+broadcast(data.room,{
+
+type:"chat",
+
+name:data.uid,
+
+text:data.text
+
+});
+
+
+}
+
+
+}catch(e){
+
+console.log(
+"WS Error:",
+e.message
+);
+
+}
+
+
+});
+
+
+
+ws.on("close",()=>{
+
+clients =
+clients.filter(
+c=>c!==ws
+);
+
+});
+
+
+});
