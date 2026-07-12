@@ -706,13 +706,13 @@ room
 
 
 
-
 const roomRef =
 db.collection("rooms")
 .doc(room);
 
 
 
+// xóa người chơi rời phòng
 
 await roomRef
 .collection("players")
@@ -720,24 +720,21 @@ await roomRef
 .delete();
 
 
+
+// xử lý đổi chủ hoặc xóa phòng
+
 await transferHostWhenLeave(room,uid);
 
 
-const players =
-await roomRef.collection("players").get();
+
+// kiểm tra phòng còn tồn tại không
+
+const check =
+await roomRef.get();
 
 
-if(!players.empty){
 
-await roomRef.update({
-lastActive:Date.now()
-});
-
-await sendRoom(room);
-
-}
-
-else{
+if(check.exists){
 
 
 await roomRef.update({
@@ -761,8 +758,9 @@ res.json({
 });
 
 
-
 }
+
+    
 catch(e){
 
 
@@ -1416,9 +1414,7 @@ await sendRoom(data.room);
 
 }
 
-
-
-ifdata.type==="ping"){
+    
 if(data.type==="ping"){
 
 
