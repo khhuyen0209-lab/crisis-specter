@@ -1417,10 +1417,14 @@ await sendRoom(data.room);
     
 if(data.type==="ping"){
 
+console.time("pong");
+
 send(ws,{
     type:"pong",
     time:data.time
 });
+
+console.timeEnd("pong");
 
 }
 
