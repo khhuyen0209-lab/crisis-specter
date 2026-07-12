@@ -1420,6 +1420,10 @@ await sendRoom(data.room);
 
 if(data.type==="ping"){
 
+
+const now = Date.now();
+
+
 const ref =
 db.collection("rooms")
 .doc(data.room)
@@ -1427,19 +1431,34 @@ db.collection("rooms")
 .doc(data.uid);
 
 
+
 const snap =
 await ref.get();
+
 
 
 if(snap.exists){
 
 await ref.update({
 
-lastSeen:Date.now()
+lastSeen:now
 
 });
 
 }
+
+
+
+// trả lại client để tính ping
+
+send(ws,{
+
+    type:"pong",
+
+    time:data.time
+
+});
+
 
 }
 
