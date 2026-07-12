@@ -1418,10 +1418,11 @@ await sendRoom(data.room);
 
 
 
+ifdata.type==="ping"){
 if(data.type==="ping"){
 
 
-const now = Date.now();
+if(data.room){
 
 
 const ref =
@@ -1441,21 +1442,24 @@ if(snap.exists){
 
 await ref.update({
 
-lastSeen:now
+lastSeen:Date.now()
 
 });
 
 }
 
 
+}
 
-// trả lại client để tính ping
+
+
+// luôn trả pong dù đang ở sảnh hay trong phòng
 
 send(ws,{
 
-    type:"pong",
+type:"pong",
 
-    time:data.time
+time:data.time
 
 });
 
