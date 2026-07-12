@@ -720,19 +720,20 @@ await roomRef
 .delete();
 
 
+await transferHostWhenLeave(room,uid);
 
 
 const players =
-await roomRef
-.collection("players")
-.get();
+await roomRef.collection("players").get();
 
 
+if(!players.empty){
 
+await roomRef.update({
+lastActive:Date.now()
+});
 
-if(players.empty){
-
-await transferHostWhenLeave(room,uid);
+await sendRoom(room);
 
 }
 
