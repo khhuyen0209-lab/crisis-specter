@@ -3,34 +3,10 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import admin from "firebase-admin";
+import { db } from "./firebase.js";
 import { WebSocketServer } from "ws";
 
 dotenv.config();
-
-// =====================
-// FIREBASE
-// =====================
-
-admin.initializeApp({
-
-credential: admin.credential.cert({  
-
-    projectId:  
-    process.env.FIREBASE_PROJECT_ID,  
-
-    clientEmail:  
-    process.env.FIREBASE_CLIENT_EMAIL,  
-
-    privateKey:  
-    process.env.FIREBASE_PRIVATE_KEY  
-    .replace(/\\n/g,"\n")  
-
-})
-
-});
-
-const db = admin.firestore();
 
 // =====================
 // EXPRESS
