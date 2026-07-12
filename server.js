@@ -1255,9 +1255,99 @@ res.status(500).json({
 
 });
 
+// =====================
+// STARST
+// =====================
+
+app.post("/room/start", async(req,res)=>{
+
+try{
+
+const {
+uid,
+room
+}=req.body;
+
+
+const ref =
+db.collection("rooms")
+.doc(room);
+
+
+const snap =
+await ref.get();
+
+
+if(!snap.exists){
+
+return res.json({
+
+ok:false,
+
+error:"Không có phòng"
+
+});
+
+}
+
+
+const data =
+snap.data();
+
+
+if(data.host !== uid){
+
+return res.json({
+
+ok:false,
+
+error:"Không phải chủ phòng"
+
+});
+
+}
 
 
 
+await ref.update({
+
+status:"developing",
+
+lastActive:Date.now()
+
+});
+
+
+
+broadcast(room,{
+
+type:"game",
+
+phase:"🚧 Đang phát triển"
+
+});
+
+
+res.json({
+
+ok:true
+
+});
+
+
+}
+catch(e){
+
+res.status(500).json({
+
+error:e.message
+
+});
+
+}
+
+
+});
 
 
 
