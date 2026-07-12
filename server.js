@@ -1052,30 +1052,63 @@ if(data.host !== uid)
 return;
 
 
+
 const players =
 await roomRef
 .collection("players")
 .get();
 
 
+
+/*
+Không còn người chơi:
+Giữ phòng lại,
+đánh dấu rỗng
+*/
+
+
 if(players.empty){
 
-await roomRef.delete();
+
+await roomRef.update({
+
+    host:null,
+
+    empty:true,
+
+    lastActive:Date.now()
+
+});
+
+
+console.log(
+"Room empty:",
+room
+);
+
 
 return;
 
 }
 
 
+
+
+// còn người -> chuyển chủ
+
+
 const newHost =
 players.docs[0].id;
 
 
+
 await roomRef.update({
 
-host:newHost,
+    host:newHost,
 
-lastActive:Date.now()
+    empty:false,
+
+    lastActive:Date.now()
 
 });
 
@@ -1088,8 +1121,8 @@ newHost
 
 await sendRoom(room);
 
-}
 
+}
 
 
 
