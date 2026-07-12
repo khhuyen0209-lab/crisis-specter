@@ -1033,31 +1033,25 @@ error:e.message
 
 async function transferHostWhenLeave(room,uid){
 
-
 const roomRef =
 db.collection("rooms")
 .doc(room);
-
 
 
 const snap =
 await roomRef.get();
 
 
-
 if(!snap.exists)
 return;
-
 
 
 const data =
 snap.data();
 
 
-
 if(data.host !== uid)
 return;
-
 
 
 const players =
@@ -1066,24 +1060,17 @@ await roomRef
 .get();
 
 
+if(players.empty){
 
-let newHost=null;
+await roomRef.delete();
 
-
-
-players.forEach(p=>{
-
-if(!newHost){
-
-newHost=p.id;
+return;
 
 }
 
-});
 
-
-
-if(newHost){
+const newHost =
+players.docs[0].id;
 
 
 await roomRef.update({
@@ -1095,15 +1082,13 @@ lastActive:Date.now()
 });
 
 
-}
-else{
+console.log(
+"New host:",
+newHost
+);
 
 
-await roomRef.delete();
-
-
-}
-
+await sendRoom(room);
 
 }
 
