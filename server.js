@@ -1428,6 +1428,43 @@ console.timeEnd("pong");
 
 }
 
+if(data.type==="heartbeat"){
+
+
+if(data.room){
+
+
+const ref =
+db.collection("rooms")
+.doc(data.room)
+.collection("players")
+.doc(data.uid);
+
+
+
+const snap =
+await ref.get();
+
+
+
+if(snap.exists){
+
+
+await ref.update({
+
+    lastSeen:Date.now()
+
+});
+
+
+}
+
+
+}
+
+
+}
+
 
 if(data.type==="chat"){
 
