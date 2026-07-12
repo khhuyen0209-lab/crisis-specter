@@ -1269,13 +1269,13 @@ room
 }=req.body;
 
 
-const ref =
+const roomRef =
 db.collection("rooms")
 .doc(room);
 
 
 const snap =
-await ref.get();
+await roomRef.get();
 
 
 if(!snap.exists){
@@ -1283,8 +1283,7 @@ if(!snap.exists){
 return res.json({
 
 ok:false,
-
-error:"Không có phòng"
+error:"Phòng không tồn tại"
 
 });
 
@@ -1300,8 +1299,7 @@ if(data.host !== uid){
 return res.json({
 
 ok:false,
-
-error:"Không phải chủ phòng"
+error:"Chỉ chủ phòng mới được bắt đầu"
 
 });
 
@@ -1309,11 +1307,27 @@ error:"Không phải chủ phòng"
 
 
 
-await ref.update({
+const players =
+await roomRef.collection("players").get();
 
-status:"developing",
 
-lastActive:Date.now()
+
+if(players.size < 3){
+
+return res.json({
+
+ok:false,
+error:"Cần ít nhất 3 người chơi"
+
+});
+
+}
+
+
+
+await roomRef.update({
+
+status:"playing"
 
 });
 
@@ -1323,9 +1337,17 @@ broadcast(room,{
 
 type:"game",
 
-phase:"🚧 Đang phát triển"
+phase:"Đang phát triển",
+
+players:players.docs.map(p=>({
+
+id:p.id,
+...p.data()
+
+}))
 
 });
+
 
 
 res.json({
@@ -1340,7 +1362,13 @@ catch(e){
 
 res.status(500).json({
 
+ok:false,
 error:e.message
+
+});
+
+}
+
 
 });
 
