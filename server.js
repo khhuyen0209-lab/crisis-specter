@@ -1417,51 +1417,12 @@ await sendRoom(data.room);
     
 if(data.type==="ping"){
 
-
-if(data.room){
-
-
-const ref =
-db.collection("rooms")
-.doc(data.room)
-.collection("players")
-.doc(data.uid);
-
-
-
-const snap =
-await ref.get();
-
-
-
-if(snap.exists){
-
-await ref.update({
-
-lastSeen:Date.now()
-
-});
-
-}
-
-
-}
-
-
-
-// luôn trả pong dù đang ở sảnh hay trong phòng
-
 send(ws,{
-
-type:"pong",
-
-time:data.time
-
+    type:"pong",
+    time:data.time
 });
 
-
 }
-
 
 
 if(data.type==="chat"){
