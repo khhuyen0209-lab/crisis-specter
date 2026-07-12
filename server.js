@@ -421,7 +421,6 @@ res.status(500).json({
 // JOIN ROOM
 // =====================
 
-
 app.post(
 "/room/join",
 async(req,res)=>{
@@ -485,6 +484,7 @@ return res.json({
 
 
 
+
 const players =
 await ref.collection("players")
 .get();
@@ -504,6 +504,8 @@ return res.json({
 }
 
 
+
+// tìm ghế trống
 
 let seat = 0;
 
@@ -531,6 +533,9 @@ used.includes(seat)
 
 
 
+
+// thêm người chơi
+
 await ref.collection("players")
 .doc(uid)
 .set({
@@ -549,11 +554,48 @@ await ref.collection("players")
 
 
 
+
+
+// nếu phòng không có chủ
+// người đầu tiên vào sẽ làm chủ
+
+const newSnap =
+await ref.get();
+
+
+const newData =
+newSnap.data();
+
+
+
+if(!newData.host){
+
+
+await ref.update({
+
+    host:uid,
+
+    empty:false,
+
+    lastActive:Date.now()
+
+});
+
+
+}
+else{
+
+
 await ref.update({
 
     lastActive:Date.now()
 
 });
+
+
+}
+
+
 
 
 
@@ -586,7 +628,6 @@ res.status(500).json({
 
 
 });
-// server.js P2/2
 
 
 // =====================
