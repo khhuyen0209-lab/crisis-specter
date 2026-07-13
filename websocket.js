@@ -87,6 +87,8 @@ export function createWebSocketServer(
 
         clients.push(ws);
 
+        console.log("Clients:", clients.length);
+
 
         send(ws, {
 
