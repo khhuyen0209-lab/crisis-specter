@@ -264,7 +264,7 @@ export function createGameManager(
 
       endNight(room);
 
-    },150000);
+    },90000);
 
 
   }
@@ -407,7 +407,7 @@ export function createGameManager(
 
       endVote(room);
 
-    },90000);
+    },30000);
 
 
   }
@@ -528,18 +528,49 @@ export function createGameManager(
 
 
     if(checkWin(room))
-      return;
+  return;
 
 
-
-    startNight(room);
+startAfternoon(room);
 
 
   }
 
 
 
+function startAfternoon(room){
 
+  const game =
+    games.get(room);
+
+
+  if(!game)
+    return;
+
+
+  game.phase="afternoon";
+
+
+  broadcast(room,{
+
+    type:"game",
+
+    phase:"afternoon",
+
+    time:60,
+
+    players:getPublicPlayers(game)
+
+  });
+
+
+  setTimeout(()=>{
+
+    startNight(room);
+
+  },60000);
+
+}
 
 
 
