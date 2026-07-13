@@ -112,11 +112,16 @@ export function createWebSocketServer(server,{sendRoom}){
 
         if(data.type==="auth"){
 
-          ws.uid=data.uid;
+  ws.uid=data.uid;
 
-          return;
+  console.log(
+    "✅ WS AUTH:",
+    ws.uid
+  );
 
-        }
+  return;
+
+}
 
 
 
