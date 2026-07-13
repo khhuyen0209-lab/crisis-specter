@@ -252,7 +252,7 @@ export function createGameManager(
 
       phase:"night",
 
-      time:150,
+      time:90,
 
       players:getPublicPlayers(game)
 
@@ -395,7 +395,7 @@ export function createGameManager(
 
       phase:"vote",
 
-      time:90,
+      time:30,
 
       players:getPublicPlayers(game)
 
