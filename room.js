@@ -206,6 +206,7 @@ router.post("/start", async (req,res)=>{
 
     await ref.update({
   status:"preparing",
+  host:null,
   lastActive:Date.now()
 });
 
