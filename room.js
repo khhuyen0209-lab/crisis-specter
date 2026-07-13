@@ -144,11 +144,7 @@ export function createRoomRouter(
       res.json({ room:found });
     }catch(e){ res.status(500).json({ error:e.message }); }
   });
-
-  // BẮT ĐẦU
-  // BẮT ĐẦU GAME
-
-router.post("/start", async (req,res)=>{
+  
 // BẮT ĐẦU GAME
 
 router.post("/start", async (req,res)=>{
