@@ -2,114 +2,251 @@ import { WebSocketServer } from "ws";
 import { db } from "./firebase.js";
 
 
-// =====================
-// QUẢN LÝ CLIENT
-// =====================
-
 export const clients = [];
 
 
-// =====================
-// GỬI TIN NHẮN
-// =====================
+// Gửi 1 kết nối
 
 export function send(ws, data) {
 
-    if (ws.readyState === 1) {
+  if(ws.readyState === 1){
 
-        ws.send(
-            JSON.stringify(data)
-        );
+    ws.send(JSON.stringify(data));
 
-    }
+  }
 
 }
 
 
-// =====================
-// GỬI TIN TOÀN BỘ PHÒNG
-// =====================
+
+// Gửi cả phòng
 
 export function broadcast(room, data) {
 
-    clients.forEach(ws => {
+  clients.forEach(ws=>{
 
-        if (
-            ws.room === room &&
-            ws.readyState === 1
-        ) {
+    if(
+      ws.room === room &&
+      ws.readyState === 1
+    ){
 
-            send(ws, data);
+      send(ws,data);
 
-        }
+    }
 
-    });
+  });
 
 }
 
 
-// =====================
-// KHỞI TẠO WEBSOCKET SERVER
-// =====================
 
-/*
-    sendRoom được truyền từ bên ngoài
+// Gửi riêng 1 người
 
-    websocket.js KHÔNG import roomUtils
-    => không tạo import vòng
-*/
+export function sendPlayer(uid, data){
 
-export function createWebSocketServer(
-    server,
-    { sendRoom }
-) {
+  clients.forEach(ws=>{
 
-    const wss =
-        new WebSocketServer({
-            server
-        });
+    if(
+      ws.uid === uid &&
+      ws.readyState === 1
+    ){
+
+      send(ws,data);
+
+    }
+
+  });
+
+}
+
+
+
+// Tạo WebSocket
+
+export function createWebSocketServer(server,{sendRoom}){
+
+
+  const wss =
+    new WebSocketServer({
+      server
+    });
+
+
+  console.log(
+    "🐺 WebSocket Server Ready"
+  );
+
+
+
+  wss.on("connection",(ws)=>{
 
 
     console.log(
-        "🐺 WebSocket Server Ready"
+      "🔌 WebSocket connected"
     );
 
 
-    wss.on(
-        "connection",
-        (ws) => {
+    clients.push(ws);
 
+
+
+    send(ws,{
+      type:"connected",
+      message:"WebSocket online"
+    });
+
+
+
+    ws.on("message",async(raw)=>{
+
+
+      try{
+
+
+        const data =
+          JSON.parse(raw);
+
+
+
+        // Xác thực người chơi
+
+        if(data.type==="auth"){
+
+          ws.uid=data.uid;
+
+          return;
+
+        }
+
+
+
+        // Vào phòng
+
+        if(data.type==="join"){
+
+          ws.room=data.room;
+
+          send(ws,{
+            type:"joined",
+            room:data.room
+          });
+
+
+          await sendRoom(data.room);
+
+        }
+
+
+
+        // Ping
+
+        if(data.type==="ping"){
+
+          send(ws,{
+            type:"pong",
+            time:data.time
+          });
+
+        }
+
+
+
+        // Heartbeat
+
+        if(
+          data.type==="heartbeat" &&
+          data.room &&
+          data.uid
+        ){
+
+          const ref =
+            db
+            .collection("rooms")
+            .doc(data.room)
+            .collection("players")
+            .doc(data.uid);
+
+
+          if((await ref.get()).exists){
+
+            await ref.update({
+              lastSeen:Date.now()
+            });
+
+          }
+
+        }
+
+
+
+        // Chat
+
+        if(data.type==="chat"){
+
+          broadcast(
+            data.room,
+            {
+              type:"chat",
+              name:data.uid,
+              text:data.text
+            }
+          );
+
+        }
+
+
+
+      }catch(e){
 
         console.log(
-            "🔌 WebSocket connected"
+          "WS Error:",
+          e.message
         );
 
-
-        clients.push(ws);
-
-        console.log("Clients:", clients.length);
+      }
 
 
-        send(ws, {
-
-            type:"connected",
-
-            message:"WebSocket online"
-
-        });
+    });
 
 
 
-        // =====================
-        // NHẬN MESSAGE
-        // =====================
-
-        ws.on(
-            "message",
-            async(raw)=>{
+    ws.on("close",()=>{
 
 
-            try {
+      const i =
+        clients.indexOf(ws);
+
+
+      if(i>-1){
+
+        clients.splice(i,1);
+
+      }
+
+
+    });
+
+
+
+    ws.on("error",(err)=>{
+
+
+      console.log(
+        "❌ WS Error:",
+        err.message
+      );
+
+
+    });
+
+
+  });
+
+
+
+  return wss;
+
+}            try {
 
 
                 const data =
