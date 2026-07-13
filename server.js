@@ -6,6 +6,14 @@ import { broadcast, createWebSocketServer } from "./websocket.js";
 import { createRoomUtils } from "./roomUtils.js";
 import { createRoomRouter } from "./room.js";
 
+process.on("SIGTERM", () => {
+  console.log("⚠️ Nhận SIGTERM từ hệ thống");
+});
+
+process.on("SIGINT", () => {
+  console.log("⚠️ Nhận SIGINT");
+});
+
 // ✅ dotenv.config() CHỈ Ở ĐÂY MỘT CHỖ DUY NHẤ
 dotenv.config();
 
