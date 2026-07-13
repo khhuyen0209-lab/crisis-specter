@@ -62,8 +62,9 @@ const roomUtils =
 
 const gameManager =
   createGameManager(
-    broadcast,
-    sendPlayer
+    db,
+    sendPlayer,
+    broadcast
   );
 
 
