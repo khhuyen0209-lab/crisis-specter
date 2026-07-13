@@ -97,12 +97,14 @@ export function createGameManager(
 
 
     await ref.update({
-
-      status:"playing",
-
-      gameStarted:Date.now()
-
-    });
+      
+  status:"playing",
+      
+  host:null,
+      
+  gameStarted:Date.now()
+      
+});
 
 
 
