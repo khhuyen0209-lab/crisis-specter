@@ -1,15 +1,34 @@
-// game.js
-
-export function createGameManager(db, sendPlayer, broadcast) {
-
+export function createGameManager(
+  db,
+  sendPlayer,
+  broadcast
+){
 
   const games = new Map();
 
 
 
-  // =========================
-  // BẮT ĐẦU GAME
-  // =========================
+  function getPublicPlayers(game){
+
+    return game.players.map(p=>({
+
+      id:p.id,
+
+      name:p.name,
+
+      avatar:p.avatar,
+
+      seat:p.seat,
+
+      alive:p.alive
+
+    }));
+
+  }
+
+
+
+
 
   async function startGame(room){
 
@@ -19,13 +38,13 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    const playersSnap =
+    const snap =
       await ref.collection("players").get();
 
 
 
     const players =
-      playersSnap.docs.map(p => ({
+      snap.docs.map(p=>({
 
         id:p.id,
 
@@ -87,20 +106,28 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    // gửi vai trò riêng
+
+    // gửi role riêng
 
     players.forEach(p=>{
 
-      sendPlayer(p.id,{
 
-        type:"role",
+      sendPlayer(
+        p.id,
+        {
 
-        role:p.role
+          type:"role",
 
-      });
+          role:p.role
+
+        }
+
+      );
 
 
     });
+
+
 
 
 
@@ -112,7 +139,9 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
       day:1,
 
-      message:"Đêm đầu tiên bắt đầu"
+      message:"🌙 Đêm đầu tiên bắt đầu",
+
+      players:getPublicPlayers(game)
 
     });
 
@@ -120,44 +149,45 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
     startNight(room);
 
+
   }
 
 
 
 
-  // =========================
-  // CHIA ROLE
-  // =========================
+
 
   function createRoles(count){
 
 
-    let wolf = 1;
-
-
-    if(count >= 5)
-      wolf = 2;
-
-
-    if(count >= 8)
-      wolf = 3;
-
-
-    if(count >= 12)
-      wolf = 4;
+    let wolves = 1;
 
 
 
-    const roles=[];
+    if(count>=5)
+      wolves=2;
+
+
+    if(count>=8)
+      wolves=3;
+
+
+    if(count>=12)
+      wolves=4;
 
 
 
-    for(let i=0;i<wolf;i++)
+    let roles=[];
+
+
+
+    for(let i=0;i<wolves;i++)
+
       roles.push("wolf");
 
 
 
-    if(count >= 3){
+    if(count>=3){
 
       roles.push("seer");
 
@@ -167,7 +197,7 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    while(roles.length < count){
+    while(roles.length<count){
 
       roles.push("villager");
 
@@ -182,18 +212,19 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
+
   function shuffle(arr){
 
-    return arr.sort(()=>Math.random()-0.5);
+    return arr
+    .sort(
+      ()=>Math.random()-0.5
+    );
 
   }
 
 
 
 
-  // =========================
-  // ĐÊM
-  // =========================
 
   function startNight(room){
 
@@ -209,18 +240,19 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
     game.phase="night";
 
-
     game.nightAction={};
 
 
 
     broadcast(room,{
 
-      type:"phase",
+      type:"game",
 
       phase:"night",
 
-      time:150
+      time:150,
+
+      players:getPublicPlayers(game)
 
     });
 
@@ -238,9 +270,8 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-  // =========================
-  // KẾT THÚC ĐÊM
-  // =========================
+
+
 
   function endNight(room){
 
@@ -255,47 +286,33 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    const action =
-      game.nightAction;
+    const wolf =
+      game.nightAction.wolf;
 
 
 
-    const target =
-      action.wolf;
+    const guard =
+      game.nightAction.guard;
 
 
 
-    if(target){
+    if(wolf && wolf!==guard){
 
-
-      const protect =
-        action.guard;
-
-
-
-      if(protect !== target){
-
-
-        killPlayer(
-          room,
-          target
-        );
-
-
-      }
-
+      killPlayer(
+        room,
+        wolf
+      );
 
     }
 
 
 
-    checkWin(room);
+    if(checkWin(room))
+      return;
 
 
 
-    if(games.has(room))
-
-      startMorning(room);
+    startMorning(room);
 
 
   }
@@ -303,16 +320,14 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-  // =========================
-  // SÁNG
-  // =========================
+
+
 
   function startMorning(room){
 
 
     const game =
       games.get(room);
-
 
 
     if(!game)
@@ -326,11 +341,13 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
     broadcast(room,{
 
-      type:"phase",
+      type:"game",
 
       phase:"morning",
 
-      time:120
+      time:120,
+
+      players:getPublicPlayers(game)
 
     });
 
@@ -348,16 +365,15 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-  // =========================
-  // VOTE
-  // =========================
+
+
+
 
   function startVote(room){
 
 
     const game =
       games.get(room);
-
 
 
     if(!game)
@@ -373,9 +389,13 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
     broadcast(room,{
 
-      type:"vote",
+      type:"game",
 
-      time:90
+      phase:"vote",
+
+      time:90,
+
+      players:getPublicPlayers(game)
 
     });
 
@@ -389,6 +409,9 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
   }
+
+
+
 
 
 
@@ -412,14 +435,22 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    if(!player || !player.alive)
+    if(
+      !player ||
+      !player.alive
+    )
       return;
 
 
 
     game.votes[uid]=target;
 
+
   }
+
+
+
+
 
 
 
@@ -431,36 +462,37 @@ export function createGameManager(db, sendPlayer, broadcast) {
       games.get(room);
 
 
-
     if(!game)
       return;
 
 
 
-    const count={};
+    const result={};
 
 
 
     Object.values(game.votes)
     .forEach(id=>{
 
-      count[id]=(count[id]||0)+1;
+      result[id] =
+      (result[id]||0)+1;
 
     });
 
 
 
-    let dead=null;
-
     let max=0;
 
+    let dead=null;
 
 
-    for(const id in count){
 
-      if(count[id]>max){
+    for(const id in result){
 
-        max=count[id];
+
+      if(result[id]>max){
+
+        max=result[id];
 
         dead=id;
 
@@ -470,11 +502,12 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    // hòa vote
 
     const same =
-      Object.values(count)
-      .filter(x=>x===max)
+      Object.values(result)
+      .filter(
+        x=>x===max
+      )
       .length;
 
 
@@ -491,60 +524,13 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    checkWin(room);
 
-
-
-    if(games.has(room))
-
-      startNight(room);
-
-
-  }
-
-
-
-
-  // =========================
-  // GIẾT NGƯỜI
-  // =========================
-
-  function killPlayer(room,uid){
-
-
-    const game =
-      games.get(room);
-
-
-
-    const p =
-      game.players.find(
-        x=>x.id===uid
-      );
-
-
-
-    if(!p)
+    if(checkWin(room))
       return;
 
 
 
-    p.alive=false;
-
-
-
-    broadcast(room,{
-
-      type:"dead",
-
-      player:uid,
-
-      faction:
-        p.role==="wolf"
-        ?"wolf"
-        :"villager"
-
-    });
+    startNight(room);
 
 
   }
@@ -552,11 +538,11 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-  // =========================
-  // KIỂM TRA THẮNG
-  // =========================
 
-  function checkWin(room){
+
+
+
+  function killPlayer(room,uid){
 
 
     const game =
@@ -569,6 +555,62 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
+    const player =
+      game.players.find(
+        p=>p.id===uid
+      );
+
+
+
+    if(!player)
+      return;
+
+
+
+    player.alive=false;
+
+
+
+    broadcast(room,{
+
+      type:"dead",
+
+      player:uid,
+
+      faction:
+        player.role==="wolf"
+        ?
+        "wolf"
+        :
+        "villager",
+
+      players:getPublicPlayers(game)
+
+    });
+
+
+  }
+
+
+
+
+
+
+
+
+  function checkWin(room){
+
+
+    const game =
+      games.get(room);
+
+
+
+    if(!game)
+      return false;
+
+
+
     const alive =
       game.players.filter(
         p=>p.alive
@@ -576,21 +618,24 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    const wolf =
+    const wolves =
       alive.filter(
         p=>p.role==="wolf"
       ).length;
 
 
 
-    const human =
-      alive.length-wolf;
+    const humans =
+      alive.length-wolves;
 
 
 
-    if(wolf===0){
+    if(wolves===0){
 
-      endGame(room,"villager");
+      endGame(
+        room,
+        "villager"
+      );
 
       return true;
 
@@ -598,9 +643,12 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
 
 
-    if(wolf>=human){
+    if(wolves>=humans){
 
-      endGame(room,"wolf");
+      endGame(
+        room,
+        "wolf"
+      );
 
       return true;
 
@@ -611,6 +659,10 @@ export function createGameManager(db, sendPlayer, broadcast) {
     return false;
 
   }
+
+
+
+
 
 
 
@@ -630,7 +682,12 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
     games.delete(room);
 
+
   }
+
+
+
+
 
 
 
@@ -644,4 +701,5 @@ export function createGameManager(db, sendPlayer, broadcast) {
 
   };
 
-}
+
+      }
