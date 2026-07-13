@@ -149,18 +149,19 @@ export function createRoomRouter(
   // BẮT ĐẦU GAME
 
 router.post("/start", async (req,res)=>{
+// BẮT ĐẦU GAME
+
+router.post("/start", async (req,res)=>{
 
   try{
 
     const { uid, room } = req.body;
 
 
-    const ref =
-      db.collection("rooms").doc(room);
+    const ref = db.collection("rooms").doc(room);
 
 
-    const s =
-      await ref.get();
+    const s = await ref.get();
 
 
     if(!s.exists){
@@ -173,8 +174,6 @@ router.post("/start", async (req,res)=>{
     }
 
 
-    // kiểm tra chủ phòng
-
     if(s.data().host !== uid){
 
       return res.json({
@@ -183,7 +182,6 @@ router.post("/start", async (req,res)=>{
       });
 
     }
-
 
 
     const players =
@@ -202,38 +200,50 @@ router.post("/start", async (req,res)=>{
 
 
 
-    // chuyển sang trạng thái chuẩn bị
-
+    // chuyển sang chuẩn bị
     await ref.update({
-  status:"preparing",
-  host:null,
-  lastActive:Date.now()
-});
+
+      status:"preparing",
+
+      lastActive:Date.now()
+
+    });
 
 
-broadcast(room,{
-  type:"game",
-  phase:"preparing",
-  message:"Đang chuẩn bị trò chơi..."
-});
+
+    broadcast(room,{
+
+      type:"game",
+
+      phase:"preparing",
+
+      message:"🐺 Đang chuẩn bị trò chơi..."
+
+    });
 
 
-// chờ chuẩn bị 3 giây rồi bắt đầu
-setTimeout(async()=>{
 
-  await gameManager.startGame(room);
+    // sau 3 giây chạy game thật
 
-},3000);
+    setTimeout(async()=>{
+
+      await gameManager.startGame(room);
+
+    },3000);
 
 
-res.json({
-  ok:true,
-  message:"Đã bắt đầu chuẩn bị"
-});
+
+    res.json({
+
+      ok:true,
+
+      message:"Đang chuẩn bị"
+
+    });
+
 
 
   }catch(e){
-
 
     res.status(500).json({
 
@@ -242,7 +252,6 @@ res.json({
       error:e.message
 
     });
-
 
   }
 
