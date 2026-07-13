@@ -4,7 +4,12 @@ import express from "express";
  * Tất cả phụ thuộc đều được truyền vào từ server
  * Không import trực tiếp db / broadcast / utils
  */
-export function createRoomRouter(db, broadcast, utils) {
+export function createRoomRouter(
+  db,
+  broadcast,
+  utils,
+  gameManager
+) {
   const router = express.Router();
   const { randomRoom, sendRoom, transferHostWhenLeave } = utils;
 
@@ -141,23 +146,113 @@ export function createRoomRouter(db, broadcast, utils) {
   });
 
   // BẮT ĐẦU
-  router.post("/start", async (req,res)=>{
-    try{
-      const { uid, room } = req.body;
-      const ref = db.collection("rooms").doc(room);
-      const s = await ref.get();
-      if(!s.exists) return res.json({ ok:false, error:"Phòng không tồn tại" });
-      if(s.data().host !== uid) return res.json({ ok:false, error:"Chỉ chủ phòng mới được bắt đầu" });
-      const players = await ref.collection("players").get();
-      if(players.size < 3) return res.json({ ok:false, error:"Cần ít nhất 3 người chơi" });
-      await ref.update({ status:"playing", lastActive:Date.now() });
-      broadcast(room, {
-        type:"game", phase:"Đang phát triển",
-        players: players.docs.map(p=>({ id:p.id, ...p.data() }))
+  // BẮT ĐẦU GAME
+
+router.post("/start", async (req,res)=>{
+
+  try{
+
+    const { uid, room } = req.body;
+
+
+    const ref =
+      db.collection("rooms").doc(room);
+
+
+    const s =
+      await ref.get();
+
+
+    if(!s.exists){
+
+      return res.json({
+        ok:false,
+        error:"Phòng không tồn tại"
       });
-      res.json({ ok:true });
-    }catch(e){ res.status(500).json({ ok:false, error:e.message }); }
-  });
+
+    }
+
+
+    // kiểm tra chủ phòng
+
+    if(s.data().host !== uid){
+
+      return res.json({
+        ok:false,
+        error:"Chỉ chủ phòng mới được bắt đầu"
+      });
+
+    }
+
+
+
+    const players =
+      await ref.collection("players").get();
+
+
+
+    if(players.size < 3){
+
+      return res.json({
+        ok:false,
+        error:"Cần ít nhất 3 người chơi"
+      });
+
+    }
+
+
+
+    // chuyển sang trạng thái chuẩn bị
+
+    await ref.update({
+
+      status:"preparing",
+
+      lastActive:Date.now()
+
+    });
+
+
+
+    // thông báo cho toàn bộ phòng
+
+    broadcast(room,{
+
+      type:"game",
+
+      phase:"preparing",
+
+      message:"Đang chuẩn bị trò chơi..."
+
+    });
+
+
+
+    res.json({
+
+      ok:true,
+
+      message:"Đã bắt đầu chuẩn bị"
+
+    });
+
+
+
+  }catch(e){
+
+
+    res.status(500).json({
+
+      ok:false,
+
+      error:e.message
+
+    });
+
+
+  }
+
+});
 
   // CHAT
   router.get("/:id/chat", async (req,res)=>{
