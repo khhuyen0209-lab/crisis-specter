@@ -205,37 +205,30 @@ router.post("/start", async (req,res)=>{
     // chuyển sang trạng thái chuẩn bị
 
     await ref.update({
-
-      status:"preparing",
-
-      lastActive:Date.now()
-
-    });
+  status:"preparing",
+  lastActive:Date.now()
+});
 
 
-
-    // thông báo cho toàn bộ phòng
-
-    broadcast(room,{
-
-      type:"game",
-
-      phase:"preparing",
-
-      message:"Đang chuẩn bị trò chơi..."
-
-    });
+broadcast(room,{
+  type:"game",
+  phase:"preparing",
+  message:"Đang chuẩn bị trò chơi..."
+});
 
 
+// chờ chuẩn bị 3 giây rồi bắt đầu
+setTimeout(async()=>{
 
-    res.json({
+  await gameManager.startGame(room);
 
-      ok:true,
+},3000);
 
-      message:"Đã bắt đầu chuẩn bị"
 
-    });
-
+res.json({
+  ok:true,
+  message:"Đã bắt đầu chuẩn bị"
+});
 
 
   }catch(e){
