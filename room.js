@@ -185,7 +185,7 @@ router.post("/start", async (req,res)=>{
 
 
 
-    if(players.size < 3){
+    if(players.size < 1){
 
       return res.json({
         ok:false,
