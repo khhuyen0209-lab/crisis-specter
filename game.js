@@ -56,7 +56,7 @@ export function createGameManager(
 
 
 
-    if(players.length < 3)
+    if(players.length < 1)
       return;
 
 
