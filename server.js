@@ -23,6 +23,10 @@ import {
 } from "./game.js";
 
 import {
+ createAuthRouter
+} from "./auth.js";
+
+import {
   createAdminRouter
 } from "./admin.js";
 
@@ -87,7 +91,8 @@ const roomRouter =
     gameManager
   );
 
-
+const authRouter =
+createAuthRouter(db);
 
 // =====================
 // ROUTES
@@ -118,7 +123,10 @@ app.use(
   adminRouter
 );
 
-
+app.use(
+ "/auth",
+ authRouter
+);
 
 // =====================
 // START SERVER
