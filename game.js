@@ -782,7 +782,13 @@ function action(room, uid, action, target){
 
   if(player.role !== "seer") return;
 
-  if(game.nightAction.seerUsed === uid) return;
+  if(game.nightAction.seerUsed === uid){
+    sendPlayer(uid,{
+      type:"info",
+      text:"❌ Bạn đã dùng kỹ năng trong đêm này."
+    });
+    return;
+  }
 
   game.nightAction.seerUsed = uid;
 
@@ -807,10 +813,15 @@ function action(room, uid, action, target){
 
   if(player.role !== "guard") return;
 
-  if(game.nightAction.guardUsed === uid) return;
+  if(game.nightAction.guardUsed === uid){
+    sendPlayer(uid,{
+      type:"info",
+      text:"❌ Bạn đã dùng kỹ năng trong đêm này."
+    });
+    return;
+  }
 
   game.nightAction.guardUsed = uid;
-
   game.nightAction.guard = target;
 
   sendPlayer(uid,{
