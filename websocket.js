@@ -199,6 +199,13 @@ export function createWebSocketServer(server,{sendRoom}){
 
         }
 
+        // Kỹ năng
+if(data.type==="action"){
+
+    console.log(data);
+
+}
+
 
 
       }catch(e){
