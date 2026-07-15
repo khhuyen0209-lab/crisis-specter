@@ -132,8 +132,8 @@ const server =
 createWebSocketServer(
   server,
   {
-    sendRoom:
-    roomUtils.sendRoom
+    sendRoom: roomUtils.sendRoom,
+    gameManager
   }
 );
 
