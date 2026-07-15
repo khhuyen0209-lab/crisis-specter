@@ -205,7 +205,12 @@ export function createWebSocketServer(server,{
         // Kỹ năng
 if(data.type==="action"){
 
-    console.log(data);
+  gameManager.action(
+    data.room,
+    data.uid,
+    data.action,
+    data.target
+  );
 
 }
 
