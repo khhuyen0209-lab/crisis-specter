@@ -84,7 +84,8 @@ export function createGameManager(
   nightAction:{
     wolfVotes:{},
     guard:null,
-    seerUsed:null
+    seerUsed:null,
+    guardUsed:null
   }
 
 };
@@ -265,9 +266,9 @@ export function createGameManager(
     game.nightAction = {
     wolfVotes:{},
     guard:null,
+    guardUsed:null,
     seerUsed:null
 };
-
 
 
     broadcast(room,{
@@ -779,41 +780,45 @@ function action(room, uid, action, target){
     // 🔮 Tiên tri
     case "see":
 
-      if(player.role !== "seer") return;
+  if(player.role !== "seer") return;
 
-      if(game.nightAction.seerUsed === uid) return;
+  if(game.nightAction.seerUsed === uid) return;
 
-      game.nightAction.seerUsed = uid;
+  game.nightAction.seerUsed = uid;
 
-      const targetPlayer =
-        game.players.find(p => p.id === target);
+  const targetPlayer =
+    game.players.find(p => p.id === target);
 
-      if(!targetPlayer) return;
+  if(!targetPlayer) return;
 
-      sendPlayer(uid,{
-        type:"see_result",
-        target,
-        faction:
-          targetPlayer.role==="wolf"
-            ? "wolf"
-            : "villager"
-      });
+  sendPlayer(uid,{
+    type:"see_result",
+    target,
+    faction:
+      targetPlayer.role==="wolf"
+        ? "wolf"
+        : "villager"
+  });
 
-      break;
+  break;
 
     // 🛡️ Bảo vệ
     case "guard":
 
-      if(player.role !== "guard") return;
+  if(player.role !== "guard") return;
 
-      game.nightAction.guard = target;
+  if(game.nightAction.guardUsed === uid) return;
 
-      sendPlayer(uid,{
-        type:"info",
-        text:"🛡️ Đã bảo vệ."
-      });
+  game.nightAction.guardUsed = uid;
 
-      break;
+  game.nightAction.guard = target;
+
+  sendPlayer(uid,{
+    type:"info",
+    text:"🛡️ Đã bảo vệ."
+  });
+
+  break;
 
   }
 
