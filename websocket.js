@@ -63,7 +63,10 @@ export function sendPlayer(uid, data){
 
 // Tạo WebSocket
 
-export function createWebSocketServer(server,{sendRoom}){
+export function createWebSocketServer(server,{
+    sendRoom,
+    gameManager
+}){
 
 
   const wss =
