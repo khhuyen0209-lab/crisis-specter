@@ -743,12 +743,65 @@ function startAfternoon(room){
 
 function action(room, uid, action, target){
 
-  console.log("Có hành động:", {
-    room,
-    uid,
-    action,
-    target
-  });
+  const game = games.get(room);
+
+  if(!game) return;
+
+  const player = game.players.find(p => p.id === uid);
+
+  if(!player || !player.alive) return;
+
+  switch(action){
+
+    // 🐺 Sói cắn
+    case "kill":
+
+      if(player.role !== "wolf") return;
+
+      game.nightAction.wolf = target;
+
+      sendPlayer(uid,{
+        type:"info",
+        text:"🐺 Đã chọn mục tiêu."
+      });
+
+      break;
+
+
+    // 🔮 Tiên tri
+    case "see":
+
+      if(player.role !== "seer") return;
+
+      const targetPlayer =
+        game.players.find(p => p.id === target);
+
+      if(!targetPlayer) return;
+
+      sendPlayer(uid,{
+        type:"see_result",
+        target,
+        role:targetPlayer.role
+      });
+
+      break;
+
+
+    // 🛡️ Bảo vệ
+    case "guard":
+
+      if(player.role !== "guard") return;
+
+      game.nightAction.guard = target;
+
+      sendPlayer(uid,{
+        type:"info",
+        text:"🛡️ Đã bảo vệ."
+      });
+
+      break;
+
+  }
 
 }
 
