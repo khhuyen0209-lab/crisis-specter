@@ -22,6 +22,10 @@ import {
   createGameManager
 } from "./game.js";
 
+import {
+  createAdminRouter
+} from "./admin.js";
+
 
 // =====================
 // ENV
@@ -67,6 +71,11 @@ const gameManager =
     broadcast
   );
 
+const adminRouter =
+  createAdminRouter(
+    db,
+    gameManager
+  );
 
 // API phòng
 
@@ -102,6 +111,11 @@ app.get("/", (_, res)=>{
 app.use(
   "/room",
   roomRouter
+);
+
+app.use(
+  "/admin",
+  adminRouter
 );
 
 
