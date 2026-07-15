@@ -722,7 +722,12 @@ function startAfternoon(room){
 
 function action(room, uid, action, target){
 
-  console.log(room, uid, action, target);
+  console.log("Có hành động:", {
+    room,
+    uid,
+    action,
+    target
+  });
 
 }
 
