@@ -263,7 +263,10 @@ export function createGameManager(
 
     game.phase="night";
 
-    game.nightAction={};
+    game.nightAction = {
+    wolfVotes:{},
+    guard:null
+};
 
 
 
@@ -298,48 +301,56 @@ export function createGameManager(
 
   function endNight(room){
 
+  const game = games.get(room);
+  if(!game) return;
 
-    const game =
-      games.get(room);
+  // Đếm phiếu của sói
+  const votes = {};
 
+  Object.values(game.nightAction.wolfVotes).forEach(id=>{
 
+    votes[id] = (votes[id] || 0) + 1;
 
-    if(!game)
-      return;
+  });
 
+  let target = null;
+  let max = 0;
 
+  for(const id in votes){
 
-    const wolf =
-      game.nightAction.wolf;
+    if(votes[id] > max){
 
-
-
-    const guard =
-      game.nightAction.guard;
-
-
-
-    if(wolf && wolf!==guard){
-
-      killPlayer(
-        room,
-        wolf
-      );
+      max = votes[id];
+      target = id;
 
     }
 
-
-
-    if(checkWin(room))
-      return;
-
-
-
-    startMorning(room);
-
-
   }
 
+  // Nếu hòa phiếu thì không ai chết
+  const same =
+    Object.values(votes)
+      .filter(v=>v===max)
+      .length;
+
+  if(same > 1){
+    target = null;
+  }
+
+  // Bảo vệ
+  if(
+    target &&
+    target !== game.nightAction.guard
+  ){
+    killPlayer(room,target);
+  }
+
+  if(checkWin(room))
+    return;
+
+  startMorning(room);
+
+}
 
 
 
@@ -744,29 +755,26 @@ function startAfternoon(room){
 function action(room, uid, action, target){
 
   const game = games.get(room);
-
   if(!game) return;
 
   const player = game.players.find(p => p.id === uid);
-
   if(!player || !player.alive) return;
 
   switch(action){
 
-    // 🐺 Sói cắn
+    // 🐺 Sói bỏ phiếu cắn
     case "kill":
 
       if(player.role !== "wolf") return;
 
-      game.nightAction.wolf = target;
+      game.nightAction.wolfVotes[uid] = target;
 
       sendPlayer(uid,{
         type:"info",
-        text:"🐺 Đã chọn mục tiêu."
+        text:"🐺 Đã bỏ phiếu."
       });
 
       break;
-
 
     // 🔮 Tiên tri
     case "see":
@@ -781,11 +789,13 @@ function action(room, uid, action, target){
       sendPlayer(uid,{
         type:"see_result",
         target,
-        role:targetPlayer.role
+        faction:
+          targetPlayer.role==="wolf"
+            ? "wolf"
+            : "villager"
       });
 
       break;
-
 
     // 🛡️ Bảo vệ
     case "guard":
