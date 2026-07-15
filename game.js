@@ -113,21 +113,42 @@ export function createGameManager(
 
     players.forEach(p=>{
 
+  // Gửi vai trò
+  sendPlayer(p.id,{
+    type:"role",
+    role:p.role
+  });
 
-      sendPlayer(
-        p.id,
-        {
+  // Gửi kỹ năng
+  let actions = [];
 
-          type:"role",
-
-          role:p.role
-
-        }
-
-      );
-
-
+  if(p.role==="wolf"){
+    actions.push({
+      id:"kill",
+      name:"🐺 Cắn"
     });
+  }
+
+  if(p.role==="seer"){
+    actions.push({
+      id:"see",
+      name:"🔮 Soi"
+    });
+  }
+
+  if(p.role==="guard"){
+    actions.push({
+      id:"guard",
+      name:"🛡️ Bảo vệ"
+    });
+  }
+
+  sendPlayer(p.id,{
+    type:"actions",
+    actions
+  });
+
+});
 
 
 
