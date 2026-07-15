@@ -76,19 +76,18 @@ export function createGameManager(
 
     const game = {
 
-      room,
+  room,
+  players,
+  phase:"night",
+  day:1,
+  votes:{},
+  nightAction:{
+    wolfVotes:{},
+    guard:null,
+    seerUsed:null
+  }
 
-      players,
-
-      phase:"night",
-
-      day:1,
-
-      votes:{},
-
-      nightAction:{}
-
-    };
+};
 
 
 
@@ -265,7 +264,8 @@ export function createGameManager(
 
     game.nightAction = {
     wolfVotes:{},
-    guard:null
+    guard:null,
+    seerUsed:null
 };
 
 
@@ -780,6 +780,10 @@ function action(room, uid, action, target){
     case "see":
 
       if(player.role !== "seer") return;
+
+      if(game.nightAction.seerUsed === uid) return;
+
+      game.nightAction.seerUsed = uid;
 
       const targetPlayer =
         game.players.find(p => p.id === target);
