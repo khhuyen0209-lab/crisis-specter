@@ -720,19 +720,22 @@ function startAfternoon(room){
 
 
 
+function action(room, uid, action, target){
+
+  console.log(room, uid, action, target);
+
+}
 
 
-
-
-  return {
+return {
 
     startGame,
 
     vote,
 
-    checkWin
+    checkWin,
+    action
 
-  };
-
+};
 
       }
