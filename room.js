@@ -16,7 +16,7 @@ export function createRoomRouter(
   // TẠO PHÒNG
   router.post("/create", async (req, res) => {
     try {
-      const { uid, maxPlayers, locked } = req.body;
+      const { uid, name, maxPlayers, locked } = req.body;
       let room;
       while (true) {
         room = randomRoom();
@@ -32,8 +32,12 @@ export function createRoomRouter(
         lastActive: Date.now()
       });
       await ref.collection("players").doc(uid).set({
-        name:"Player", avatar:"👑", seat:0, ready:true, lastSeen:Date.now()
-      });
+    name:name || "Player",
+    avatar:"👑",
+    seat:0,
+    ready:true,
+    lastSeen:Date.now()
+});
       await sendRoom(room);
       res.json({ ok:true, room });
     } catch(e){ res.status(500).json({ ok:false, error:e.message }); }
@@ -41,8 +45,8 @@ export function createRoomRouter(
 
   // VÀO PHÒNG
   router.post("/join", async (req, res) => {
-    try {
-      const { uid, room } = req.body;
+    try{
+      const { uid, room, name } = req.body;
       const ref = db.collection("rooms").doc(room);
       const snap = await ref.get();
       if(!snap.exists) return res.json({ ok:false, error:"Không tồn tại phòng" });
@@ -55,8 +59,12 @@ export function createRoomRouter(
       let seat = 0; while(used.includes(seat)) seat++;
 
       await ref.collection("players").doc(uid).set({
-        name:"Player "+(seat+1), avatar:"🙂", seat, ready:false, lastSeen:Date.now()
-      });
+    name:name || ("Player "+(seat+1)),
+    avatar:"🙂",
+    seat,
+    ready:false,
+    lastSeen:Date.now()
+});
 
       const nd = (await ref.get()).data();
       if(!nd.host){
