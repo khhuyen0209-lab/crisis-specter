@@ -835,6 +835,12 @@ function action(room, uid, action, target){
 
 }
 
+function getGamesCount(){
+
+  return games.size;
+
+}
+
 
 return {
 
@@ -843,7 +849,10 @@ return {
     vote,
 
     checkWin,
-    action
+  
+    action,
+
+    getGamesCount
 
 };
 
