@@ -216,13 +216,30 @@ if(data.type==="action"){
 
 if(data.type==="sync"){
 
-  console.log("SYNC:", data.room);
+    console.log(
+        "🔄 Sync request:",
+        data.uid,
+        "Room:",
+        data.room
+    );
 
     const game = gameManager.getGame(data.room);
 
+    console.log(
+        "Game exists:",
+        !!game
+    );
+
     if(game){
 
-        broadcast(data.room,{
+        console.log(
+            "Phase:",
+            game.phase,
+            "Players:",
+            game.players.length
+        );
+
+        send(ws,{
             type:"game",
             phase:game.phase,
             day:game.day,
@@ -231,13 +248,14 @@ if(data.type==="sync"){
 
     }else{
 
+        console.log("Không có game, gửi lobby");
+
         await sendRoom(data.room);
 
     }
 
     return;
 }
-
 
 
       }catch(e){
