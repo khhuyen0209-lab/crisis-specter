@@ -2,16 +2,26 @@ import { WebSocketServer } from "ws";
 import { db } from "./firebase.js";
 
 
-export const clients = [];
+/*
+=================================
+ SESSION MANAGER
+=================================
+*/
+
+export const clients = new Map();
 
 
-// Gửi 1 kết nối
 
-export function send(ws, data) {
+function send(ws,data){
 
-  if(ws.readyState === 1){
+  if(
+    ws &&
+    ws.readyState === 1
+  ){
 
-    ws.send(JSON.stringify(data));
+    ws.send(
+      JSON.stringify(data)
+    );
 
   }
 
@@ -19,11 +29,25 @@ export function send(ws, data) {
 
 
 
-// Gửi cả phòng
 
-export function broadcast(room, data) {
+export function sendPlayer(uid,data){
 
-  clients.forEach(ws=>{
+  const ws = clients.get(uid);
+
+  if(ws){
+
+    send(ws,data);
+
+  }
+
+}
+
+
+
+
+export function broadcast(room,data){
+
+  for(const ws of clients.values()){
 
     if(
       ws.room === room &&
@@ -34,278 +58,558 @@ export function broadcast(room, data) {
 
     }
 
-  });
+  }
 
 }
 
 
 
-// Gửi riêng 1 người
 
-export function sendPlayer(uid, data){
+function changeState(ws,location,room=null){
 
-  clients.forEach(ws=>{
+  ws.location = location;
+  ws.room = room;
 
-    if(
-      ws.uid === uid &&
-      ws.readyState === 1
-    ){
+}
 
-      send(ws,data);
+
+
+
+
+/*
+=================================
+ TÌM PHÒNG CỦA NGƯỜI CHƠI
+=================================
+*/
+
+async function findPlayerRoom(uid){
+
+  const rooms =
+    await db.collection("rooms").get();
+
+
+  for(const r of rooms.docs){
+
+    const p =
+      await r.ref
+      .collection("players")
+      .doc(uid)
+      .get();
+
+
+    if(p.exists){
+
+      return r.id;
 
     }
 
-  });
+  }
+
+
+  return null;
 
 }
 
 
 
-// Tạo WebSocket
-
-export function createWebSocketServer(server,{
-    sendRoom,
-    gameManager
-}){
 
 
-  const wss =
-    new WebSocketServer({
-      server
-    });
+/*
+=================================
+ CREATE WS SERVER
+=================================
+*/
+
+export function createWebSocketServer(
+server,
+{
+ sendRoom,
+ gameManager
+}
+){
 
 
-  console.log(
-    "🐺 WebSocket Server Ready"
-  );
-
-
-
-  wss.on("connection",(ws)=>{
-
-
-    console.log(
-      "🔌 WebSocket connected"
-    );
-
-
-    clients.push(ws);
+const wss =
+new WebSocketServer({
+ server
+});
 
 
 
-    send(ws,{
-      type:"connected",
-      message:"WebSocket online"
-    });
+console.log(
+"🐺 WebSocket Server Ready"
+);
 
 
 
-    ws.on("message",async(raw)=>{
+wss.on(
+"connection",
+(ws)=>{
 
 
-      try{
-
-
-        const data =
-          JSON.parse(raw);
+console.log(
+"🔌 Connected"
+);
 
 
 
-        // Xác thực người chơi
+/*
+ SESSION STATE
+*/
 
-        if(data.type==="auth"){
+ws.uid=null;
 
-  ws.uid=data.uid;
+ws.room=null;
 
-  console.log(
-    "✅ WS AUTH:",
-    ws.uid
-  );
+ws.location="lobby";
 
-  return;
+
+
+
+
+send(ws,{
+
+ type:"connected",
+
+ message:"WebSocket online"
+
+});
+
+
+
+
+
+ws.on(
+"message",
+async(raw)=>{
+
+
+try{
+
+
+const data =
+JSON.parse(raw);
+
+
+
+
+
+/*
+====================
+ AUTH
+====================
+*/
+
+if(data.type==="auth"){
+
+
+ws.uid=data.uid;
+
+
+clients.set(
+ws.uid,
+ws
+);
+
+
+
+console.log(
+"✅ AUTH",
+ws.uid
+);
+
+
+
+return;
 
 }
 
 
 
-        // Vào phòng
-
-        if(data.type==="join"){
-
-          ws.room=data.room;
-
-          send(ws,{
-            type:"joined",
-            room:data.room
-          });
-
-
-          await sendRoom(data.room);
-
-        }
 
 
 
-        // Ping
-
-        if(data.type==="ping"){
-
-          send(ws,{
-            type:"pong",
-            time:data.time
-          });
-
-        }
+/*
+====================
+ JOIN ROOM
+====================
+*/
 
 
-
-        // Heartbeat
-
-        if(
-          data.type==="heartbeat" &&
-          data.room &&
-          data.uid
-        ){
-
-          const ref =
-            db
-            .collection("rooms")
-            .doc(data.room)
-            .collection("players")
-            .doc(data.uid);
+if(data.type==="join"){
 
 
-          if((await ref.get()).exists){
-
-            await ref.update({
-              lastSeen:Date.now()
-            });
-
-          }
-
-        }
+if(!ws.uid)
+return;
 
 
 
-        // Chat
+const room=data.room;
 
-        if(data.type==="chat"){
 
-          broadcast(
-            data.room,
-            {
-              type:"chat",
-              name:data.uid,
-              text:data.text
-            }
-          );
 
-        }
+changeState(
+ws,
+"room",
+room
+);
 
-        // Kỹ năng
+
+
+send(ws,{
+
+type:"joined",
+
+room
+
+});
+
+
+
+await sendRoom(room);
+
+
+
+return;
+
+}
+
+
+
+
+
+
+
+/*
+====================
+ HEARTBEAT
+====================
+*/
+
+
+if(data.type==="heartbeat"){
+
+
+if(
+!ws.uid ||
+!ws.room
+)
+return;
+
+
+
+const ref =
+db
+.collection("rooms")
+.doc(ws.room)
+.collection("players")
+.doc(ws.uid);
+
+
+
+if(
+(await ref.get()).exists
+){
+
+await ref.update({
+
+lastSeen:Date.now()
+
+});
+
+}
+
+
+return;
+
+}
+
+
+
+
+
+
+
+
+/*
+====================
+ CHAT
+====================
+*/
+
+
+if(data.type==="chat"){
+
+
+if(
+!ws.room
+)
+return;
+
+
+
+broadcast(
+ws.room,
+{
+
+type:"chat",
+
+name:ws.uid,
+
+text:data.text
+
+});
+
+
+return;
+
+}
+
+
+
+
+
+
+
+
+
+/*
+====================
+ GAME ACTION
+====================
+*/
+
+
 if(data.type==="action"){
 
-  gameManager.action(
-    data.room,
-    data.uid,
-    data.action,
-    data.target
-  );
+
+if(
+ws.location!=="game"
+&&
+ws.room
+)
+{
+
+
+gameManager.action(
+
+ws.room,
+
+ws.uid,
+
+data.action,
+
+data.target
+
+);
+
 
 }
+
+
+
+return;
+
+}
+
+
+
+
+
+
+
+
+/*
+====================
+ SYNC
+====================
+*/
+
 
 if(data.type==="sync"){
 
-    console.log(
-        "🔄 Sync request:",
-        data.uid,
-        "Room:",
-        data.room
-    );
 
-    const game = gameManager.getGame(data.room);
 
-    console.log(
-        "Game exists:",
-        !!game
-    );
+if(!ws.uid)
+return;
 
-    if(game){
 
-        console.log(
-            "Phase:",
-            game.phase,
-            "Players:",
-            game.players.length
-        );
 
-        send(ws,{
-            type:"game",
-            phase:game.phase,
-            day:game.day,
-            players:game.players
-        });
+const room =
+await findPlayerRoom(
+ws.uid
+);
 
-    }else{
 
-        console.log("Không có game, gửi lobby");
 
-        await sendRoom(data.room);
+if(!room){
 
-    }
 
-    return;
+changeState(
+ws,
+"lobby"
+);
+
+
+
+send(ws,{
+
+type:"sync",
+
+location:"lobby"
+
+});
+
+
+return;
+
 }
 
 
-      }catch(e){
-
-        console.log(
-          "WS Error:",
-          e.message
-        );
-
-      }
-
-
-    });
 
 
 
-    ws.on("close",()=>{
-
-
-      const i =
-        clients.indexOf(ws);
-
-
-      if(i>-1){
-
-        clients.splice(i,1);
-
-      }
-
-
-    });
+ws.room=room;
 
 
 
-    ws.on("error",(err)=>{
-
-
-      console.log(
-        "❌ WS Error:",
-        err.message
-      );
-
-
-    });
-
-
-  });
+const game =
+gameManager.getGame(room);
 
 
 
-  return wss;
+if(game){
+
+
+changeState(
+ws,
+"game",
+room
+);
+
+
+
+send(ws,{
+
+type:"game",
+
+phase:game.phase,
+
+day:game.day,
+
+players:
+game.players.map(p=>({
+
+id:p.id,
+
+name:p.name,
+
+avatar:p.avatar,
+
+alive:p.alive
+
+}))
+
+});
+
+
+}else{
+
+
+changeState(
+ws,
+"room",
+room
+);
+
+
+await sendRoom(room);
+
+
+}
+
+
+
+return;
+
+}
+
+
+
+
+
+
+
+
+}catch(e){
+
+
+console.log(
+"WS ERROR:",
+e.message
+);
+
+
+}
+
+
+});
+
+
+
+
+
+
+
+
+ws.on(
+"close",
+()=>{
+
+
+if(ws.uid){
+
+clients.delete(
+ws.uid
+);
+
+}
+
+
+
+console.log(
+"🔌 Disconnected",
+ws.uid
+);
+
+
+
+});
+
+
+
+
+
+
+ws.on(
+"error",
+(err)=>{
+
+
+console.log(
+"WS ERROR",
+err.message
+);
+
+
+});
+
+
+});
+
+
+
+return wss;
+
 
 }
