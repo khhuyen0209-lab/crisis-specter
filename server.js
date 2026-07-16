@@ -7,7 +7,9 @@ import { db } from "./firebase.js";
 import {
   broadcast,
   sendPlayer,
-  createWebSocketServer
+  setRoomState,
+  createWebSocketServer,
+  playerRooms
 } from "./websocket.js";
 
 import {
@@ -23,7 +25,7 @@ import {
 } from "./game.js";
 
 import {
- createAuthRouter
+  createAuthRouter
 } from "./auth.js";
 
 import {
@@ -53,27 +55,32 @@ app.use(express.json());
 
 
 // =====================
-// TẠO MODULE
+// MODULE
 // =====================
 
 
-// Logic phòng
+// Quản lý phòng
 
 const roomUtils =
   createRoomUtils(
     broadcast,
-    db
+    db,
+    playerRooms
   );
 
 
-// Logic game
+// Quản lý game
 
 const gameManager =
   createGameManager(
     db,
     sendPlayer,
-    broadcast
+    broadcast,
+    setRoomState
   );
+
+
+// Admin
 
 const adminRouter =
   createAdminRouter(
@@ -81,24 +88,32 @@ const adminRouter =
     gameManager
   );
 
-// API phòng
+
+// Router phòng
 
 const roomRouter =
   createRoomRouter(
     db,
     broadcast,
     roomUtils,
-    gameManager
+    gameManager,
+    playerRooms
   );
 
+
+// Auth
+
 const authRouter =
-createAuthRouter(db);
+  createAuthRouter(
+    db
+  );
+
 
 // =====================
 // ROUTES
 // =====================
 
-app.get("/", (_, res)=>{
+app.get("/",(_,res)=>{
 
   res.json({
 
@@ -106,7 +121,7 @@ app.get("/", (_, res)=>{
 
     game:"Werewolf Online Server",
 
-    version:"V2"
+    version:"V3"
 
   });
 
@@ -118,15 +133,18 @@ app.use(
   roomRouter
 );
 
+
 app.use(
   "/admin",
   adminRouter
 );
 
+
 app.use(
- "/auth",
- authRouter
+  "/auth",
+  authRouter
 );
+
 
 // =====================
 // START SERVER
@@ -138,12 +156,28 @@ const server =
     ()=>{
 
       console.log(
-        "🚀 Server running on port",
+        "🚀 Server running:",
         PORT
       );
 
     }
   );
+
+
+
+server.on(
+  "error",
+  (err)=>{
+
+    console.error(
+      "❌ Server error:",
+      err.message
+    );
+
+    process.exit(1);
+
+  }
+);
 
 
 
@@ -154,8 +188,12 @@ const server =
 createWebSocketServer(
   server,
   {
-    sendRoom: roomUtils.sendRoom,
-    gameManager
+    sendRoom:
+      roomUtils.sendRoom,
+
+    gameManager,
+
+    playerRooms
   }
 );
 
@@ -164,6 +202,9 @@ createWebSocketServer(
 // =====================
 // CRON
 // =====================
+
+
+// Xóa phòng trống
 
 setInterval(
 
@@ -174,10 +215,31 @@ setInterval(
 );
 
 
+// Kiểm tra người chơi offline
+
 setInterval(
 
   roomUtils.checkOffline,
 
   30_000
 
+);
+
+
+
+// =====================
+// SHUTDOWN
+// =====================
+
+process.on(
+  "SIGINT",
+  ()=>{
+
+    console.log(
+      "🛑 Server shutting down..."
+    );
+
+    process.exit();
+
+  }
 );
