@@ -216,6 +216,8 @@ if(data.type==="action"){
 
 if(data.type==="sync"){
 
+  console.log("SYNC:", data.room);
+
     const game = gameManager.getGame(data.room);
 
     if(game){
