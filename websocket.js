@@ -4,23 +4,46 @@ import { db } from "./firebase.js";
 
 /*
 =================================
- SESSION MANAGER
+ SESSION
 =================================
 */
 
 export const clients = new Map();
 
 
+// uid -> room cache
+const playerRooms = new Map();
 
-function send(ws,data){
 
-  if(
-    ws &&
-    ws.readyState === 1
-  ){
 
-    ws.send(
-      JSON.stringify(data)
+
+
+/*
+=================================
+ SEND
+=================================
+*/
+
+export function send(ws,data){
+
+  try{
+
+    if(
+      ws &&
+      ws.readyState === 1
+    ){
+
+      ws.send(
+        JSON.stringify(data)
+      );
+
+    }
+
+  }catch(e){
+
+    console.log(
+      "SEND ERROR:",
+      e.message
     );
 
   }
@@ -30,9 +53,20 @@ function send(ws,data){
 
 
 
+
+
+
+/*
+=================================
+ SEND PLAYER
+=================================
+*/
+
 export function sendPlayer(uid,data){
 
-  const ws = clients.get(uid);
+  const ws =
+    clients.get(uid);
+
 
   if(ws){
 
@@ -45,9 +79,20 @@ export function sendPlayer(uid,data){
 
 
 
+
+
+
+/*
+=================================
+ BROADCAST
+=================================
+*/
+
 export function broadcast(room,data){
 
-  for(const ws of clients.values()){
+  for(
+    const ws of clients.values()
+  ){
 
     if(
       ws.room === room &&
@@ -65,10 +110,38 @@ export function broadcast(room,data){
 
 
 
-function changeState(ws,location,room=null){
+
+
+
+/*
+=================================
+ STATE
+=================================
+*/
+
+export function changeState(
+ws,
+location,
+room=null
+){
 
   ws.location = location;
+
   ws.room = room;
+
+
+  if(
+    ws.uid &&
+    room
+  ){
+
+    playerRooms.set(
+      ws.uid,
+      room
+    );
+
+  }
+
 
 }
 
@@ -76,34 +149,107 @@ function changeState(ws,location,room=null){
 
 
 
+
+export function setRoomState(
+room,
+state
+){
+
+  for(
+    const ws of clients.values()
+  ){
+
+    if(
+      ws.room === room
+    ){
+
+      ws.location = state;
+
+    }
+
+  }
+
+}
+
+
+
+
+
+
+
+
 /*
 =================================
- TÌM PHÒNG CỦA NGƯỜI CHƠI
+ FIND ROOM
 =================================
 */
 
 async function findPlayerRoom(uid){
 
-  const rooms =
-    await db.collection("rooms").get();
+
+  // RAM trước
+
+  if(
+    playerRooms.has(uid)
+  ){
+
+    return playerRooms.get(uid);
+
+  }
 
 
-  for(const r of rooms.docs){
 
-    const p =
-      await r.ref
-      .collection("players")
-      .doc(uid)
+
+  // fallback Firebase
+
+  try{
+
+
+    const rooms =
+      await db
+      .collection("rooms")
       .get();
 
 
-    if(p.exists){
 
-      return r.id;
+    for(
+      const r of rooms.docs
+    ){
+
+
+      const p =
+        await r.ref
+        .collection("players")
+        .doc(uid)
+        .get();
+
+
+
+      if(p.exists){
+
+
+        playerRooms.set(
+          uid,
+          r.id
+        );
+
+
+        return r.id;
+
+      }
 
     }
 
+
+  }catch(e){
+
+    console.log(
+      "Find room error:",
+      e.message
+    );
+
   }
+
 
 
   return null;
@@ -114,9 +260,13 @@ async function findPlayerRoom(uid){
 
 
 
+
+
+
+
 /*
 =================================
- CREATE WS SERVER
+ CREATE SERVER
 =================================
 */
 
@@ -136,9 +286,12 @@ new WebSocketServer({
 
 
 
+
 console.log(
-"🐺 WebSocket Server Ready"
+"🐺 WebSocket Ready"
 );
+
+
 
 
 
@@ -147,16 +300,6 @@ wss.on(
 (ws)=>{
 
 
-console.log(
-"🔌 Connected"
-);
-
-
-
-/*
- SESSION STATE
-*/
-
 ws.uid=null;
 
 ws.room=null;
@@ -164,16 +307,22 @@ ws.room=null;
 ws.location="lobby";
 
 
+ws.lastMessage=0;
+
+
 
 
 
 send(ws,{
 
- type:"connected",
+type:"connected",
 
- message:"WebSocket online"
+message:"online"
 
 });
+
+
+
 
 
 
@@ -187,6 +336,25 @@ async(raw)=>{
 try{
 
 
+// rate limit
+
+const now =
+Date.now();
+
+
+if(
+now - ws.lastMessage < 50
+){
+
+return;
+
+}
+
+
+ws.lastMessage = now;
+
+
+
 const data =
 JSON.parse(raw);
 
@@ -194,16 +362,39 @@ JSON.parse(raw);
 
 
 
+
+
+
 /*
-====================
- AUTH
-====================
+==================
+AUTH
+==================
 */
 
 if(data.type==="auth"){
 
 
-ws.uid=data.uid;
+const old =
+clients.get(
+data.uid
+);
+
+
+
+if(
+old &&
+old!==ws
+){
+
+old.close();
+
+}
+
+
+
+ws.uid =
+data.uid;
+
 
 
 clients.set(
@@ -213,13 +404,6 @@ ws
 
 
 
-console.log(
-"✅ AUTH",
-ws.uid
-);
-
-
-
 return;
 
 }
@@ -229,12 +413,14 @@ return;
 
 
 
-/*
-====================
- JOIN ROOM
-====================
-*/
 
+
+
+/*
+==================
+JOIN
+==================
+*/
 
 if(data.type==="join"){
 
@@ -244,14 +430,10 @@ return;
 
 
 
-const room=data.room;
-
-
-
 changeState(
 ws,
 "room",
-room
+data.room
 );
 
 
@@ -260,13 +442,26 @@ send(ws,{
 
 type:"joined",
 
-room
+room:data.room
 
 });
 
 
 
-await sendRoom(room);
+try{
+
+await sendRoom(
+data.room
+);
+
+}catch(e){
+
+console.log(
+"sendRoom error",
+e.message
+);
+
+}
 
 
 
@@ -280,12 +475,14 @@ return;
 
 
 
-/*
-====================
- HEARTBEAT
-====================
-*/
 
+
+
+/*
+==================
+HEARTBEAT
+==================
+*/
 
 if(data.type==="heartbeat"){
 
@@ -331,19 +528,82 @@ return;
 
 
 
+
+
 /*
-====================
- CHAT
-====================
+==================
+LEAVE
+==================
 */
 
+if(data.type==="leave"){
+
+
+const room =
+ws.room;
+
+
+
+if(
+room &&
+ws.uid
+){
+
+
+await db
+.collection("rooms")
+.doc(room)
+.collection("players")
+.doc(ws.uid)
+.delete();
+
+
+
+playerRooms.delete(
+ws.uid
+);
+
+
+
+try{
+
+await sendRoom(room);
+
+}catch{}
+
+}
+
+
+
+changeState(
+ws,
+"lobby"
+);
+
+
+
+return;
+
+}
+
+
+
+
+
+
+
+
+
+/*
+==================
+CHAT
+==================
+*/
 
 if(data.type==="chat"){
 
 
-if(
-!ws.room
-)
+if(!ws.room)
 return;
 
 
@@ -361,6 +621,7 @@ text:data.text
 });
 
 
+
 return;
 
 }
@@ -374,21 +635,19 @@ return;
 
 
 /*
-====================
- GAME ACTION
-====================
+==================
+ACTION
+==================
 */
-
 
 if(data.type==="action"){
 
 
 if(
 ws.location!=="game"
-&&
-ws.room
 )
-{
+return;
+
 
 
 gameManager.action(
@@ -404,9 +663,6 @@ data.target
 );
 
 
-}
-
-
 
 return;
 
@@ -419,15 +675,15 @@ return;
 
 
 
+
+
 /*
-====================
- SYNC
-====================
+==================
+SYNC
+==================
 */
 
-
 if(data.type==="sync"){
-
 
 
 if(!ws.uid)
@@ -439,6 +695,7 @@ const room =
 await findPlayerRoom(
 ws.uid
 );
+
 
 
 
@@ -468,13 +725,10 @@ return;
 
 
 
-
-ws.room=room;
-
-
-
 const game =
-gameManager.getGame(room);
+gameManager.getGame(
+room
+);
 
 
 
@@ -489,9 +743,16 @@ room
 
 
 
+const me =
+game.players.find(
+p=>p.id===ws.uid
+);
+
+
+
 send(ws,{
 
-type:"game",
+type:"game_sync",
 
 phase:game.phase,
 
@@ -506,11 +767,17 @@ name:p.name,
 
 avatar:p.avatar,
 
+seat:p.seat,
+
 alive:p.alive
 
-}))
+})),
+
+role:
+me?.role || null
 
 });
+
 
 
 }else{
@@ -523,8 +790,12 @@ room
 );
 
 
+
+try{
+
 await sendRoom(room);
 
+}catch{}
 
 }
 
@@ -539,16 +810,12 @@ return;
 
 
 
-
-
 }catch(e){
-
 
 console.log(
 "WS ERROR:",
 e.message
 );
-
 
 }
 
@@ -567,7 +834,10 @@ ws.on(
 ()=>{
 
 
-if(ws.uid){
+if(
+ws.uid &&
+clients.get(ws.uid)===ws
+){
 
 clients.delete(
 ws.uid
@@ -577,30 +847,19 @@ ws.uid
 
 
 
-console.log(
-"🔌 Disconnected",
-ws.uid
-);
-
-
-
 });
-
-
 
 
 
 
 ws.on(
 "error",
-(err)=>{
-
+e=>{
 
 console.log(
-"WS ERROR",
-err.message
+"WS ERROR:",
+e.message
 );
-
 
 });
 
@@ -610,6 +869,5 @@ err.message
 
 
 return wss;
-
 
 }
