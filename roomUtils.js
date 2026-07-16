@@ -174,44 +174,43 @@ export function createRoomUtils(broadcast, db) {
 
       for (const room of rooms.docs) {
 
+  const roomData = room.data();
 
-        const players = await room.ref
-          .collection("players")
-          .get();
+  // Chỉ kick khi phòng đang chờ
+  if (roomData.status !== "waiting") {
+    continue;
+  }
 
+  const players = await room.ref
+    .collection("players")
+    .get();
 
+  for (const p of players.docs) {
 
-        for (const p of players.docs) {
+    if (
+      p.data().lastSeen &&
+      now - p.data().lastSeen > 120000
+    ) {
 
+      await p.ref.delete();
 
-          if (
-            p.data().lastSeen &&
-            now - p.data().lastSeen > 120000
-          ) {
+      await transferHostWhenLeave(
+        room.id,
+        p.id
+      );
 
+      console.log(
+        "Kick offline:",
+        p.id
+      );
 
-            await p.ref.delete();
+    }
 
+  }
 
-            await transferHostWhenLeave(
-              room.id,
-              p.id
-            );
+  await sendRoom(room.id);
 
-
-            console.log(
-              "Kick offline:",
-              p.id
-            );
-
-          }
-
-        }
-
-
-        await sendRoom(room.id);
-
-      }
+}
 
 
     } catch (e) {
