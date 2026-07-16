@@ -9,6 +9,7 @@ import { db } from "./firebase.js";
 */
 
 export const clients = new Map();
+export const playerRooms = new Map();
 
 
 // uid -> room cache
