@@ -214,6 +214,28 @@ if(data.type==="action"){
 
 }
 
+if(data.type==="sync"){
+
+    const game = gameManager.getGame(data.room);
+
+    if(game){
+
+        broadcast(data.room,{
+            type:"game",
+            phase:game.phase,
+            day:game.day,
+            players:game.players
+        });
+
+    }else{
+
+        await sendRoom(data.room);
+
+    }
+
+    return;
+}
+
 
 
       }catch(e){
