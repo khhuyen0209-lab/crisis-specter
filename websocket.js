@@ -799,7 +799,36 @@ return;
 
 }
 
+if(data.type==="syncGame"){
 
+
+try{
+
+
+await gameManager.syncGame(
+
+data.room,
+
+data.uid,
+
+ws
+
+);
+
+
+}catch(e){
+
+console.log(
+"sync game error:",
+e.message
+);
+
+}
+
+
+return;
+
+   }
 
 
 
