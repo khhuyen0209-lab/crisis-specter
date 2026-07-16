@@ -1,10 +1,13 @@
 export function createGameManager(
   db,
   sendPlayer,
-  broadcast
+  broadcast,
+  setRoomState
 ){
 
   const games = new Map();
+
+  const timers = new Map();
 
 
 
@@ -13,18 +16,52 @@ export function createGameManager(
     return game.players.map(p=>({
 
       id:p.id,
-
       name:p.name,
-
       avatar:p.avatar,
-
       seat:p.seat,
-
       alive:p.alive
 
     }));
 
   }
+
+
+
+
+  function setTimer(room,callback,time){
+
+    clearTimer(room);
+
+    const t = setTimeout(()=>{
+
+      timers.delete(room);
+
+      callback();
+
+    },time);
+
+
+    timers.set(room,t);
+
+  }
+
+
+
+
+  function clearTimer(room){
+
+    const t = timers.get(room);
+
+    if(t){
+
+      clearTimeout(t);
+
+      timers.delete(room);
+
+    }
+
+  }
+
 
 
 
@@ -74,81 +111,146 @@ export function createGameManager(
 
 
 
+
+
     const game = {
 
-  room,
-  players,
-  phase:"night",
-  day:1,
-  votes:{},
-  nightAction:{
-    wolfVotes:{},
-    guard:null,
-    seerUsed:null,
-    guardUsed:null
-  }
+      room,
 
-};
+      players,
+
+      phase:"night",
+
+      day:1,
+
+      votes:{},
+
+      nightAction:{
+
+        wolfVotes:{},
+
+        guard:null,
+
+        seerUsed:null,
+
+        guardUsed:null
+
+      }
+
+    };
 
 
 
-    games.set(room,game);
+
+    games.set(
+      room,
+      game
+    );
 
 
 
     await ref.update({
-      
-  status:"playing",
-      
-  host:null,
-      
-  gameStarted:Date.now()
-      
-});
+
+      status:"playing",
+
+      host:null,
+
+      gameStarted:Date.now()
+
+    });
+
+
+
+    // báo WS chuyển trạng thái
+
+    if(setRoomState){
+
+      setRoomState(
+        room,
+        "game"
+      );
+
+    }
 
 
 
 
-    // gửi role riêng
+
 
     players.forEach(p=>{
 
-  // Gửi vai trò
-  sendPlayer(p.id,{
-    type:"role",
-    role:p.role
-  });
 
-  // Gửi kỹ năng
-  let actions = [];
+      sendPlayer(p.id,{
 
-  if(p.role==="wolf"){
-    actions.push({
-      id:"kill",
-      name:"🐺 Cắn"
+        type:"role",
+
+        role:p.role
+
+      });
+
+
+
+
+      let actions=[];
+
+
+
+      if(p.role==="wolf"){
+
+        actions.push({
+
+          id:"kill",
+
+          name:"🐺 Cắn"
+
+        });
+
+      }
+
+
+
+
+      if(p.role==="seer"){
+
+        actions.push({
+
+          id:"see",
+
+          name:"🔮 Soi"
+
+        });
+
+      }
+
+
+
+
+      if(p.role==="guard"){
+
+        actions.push({
+
+          id:"guard",
+
+          name:"🛡️ Bảo vệ"
+
+        });
+
+      }
+
+
+
+      sendPlayer(p.id,{
+
+        type:"actions",
+
+        actions
+
+      });
+
+
+
     });
-  }
 
-  if(p.role==="seer"){
-    actions.push({
-      id:"see",
-      name:"🔮 Soi"
-    });
-  }
-
-  if(p.role==="guard"){
-    actions.push({
-      id:"guard",
-      name:"🛡️ Bảo vệ"
-    });
-  }
-
-  sendPlayer(p.id,{
-    type:"actions",
-    actions
-  });
-
-});
 
 
 
@@ -161,6 +263,8 @@ export function createGameManager(
       phase:"night",
 
       day:1,
+
+      time:90,
 
       message:"🌙 Đêm đầu tiên bắt đầu",
 
@@ -180,23 +284,32 @@ export function createGameManager(
 
 
 
+
+
+
   function createRoles(count){
 
 
-    let wolves = 1;
+    let wolves=1;
 
 
 
     if(count>=5)
+
       wolves=2;
 
 
+
     if(count>=8)
+
       wolves=3;
 
 
+
     if(count>=12)
+
       wolves=4;
+
 
 
 
@@ -204,9 +317,12 @@ export function createGameManager(
 
 
 
+
     for(let i=0;i<wolves;i++)
 
       roles.push("wolf");
+
+
 
 
 
@@ -220,11 +336,13 @@ export function createGameManager(
 
 
 
+
     while(roles.length<count){
 
       roles.push("villager");
 
     }
+
 
 
 
@@ -236,14 +354,18 @@ export function createGameManager(
 
 
 
+
+
   function shuffle(arr){
 
-    return arr
-    .sort(
+    return arr.sort(
       ()=>Math.random()-0.5
     );
 
   }
+
+
+
 
 
 
@@ -256,19 +378,32 @@ export function createGameManager(
       games.get(room);
 
 
+
     if(!game)
+
       return;
+
 
 
 
     game.phase="night";
 
-    game.nightAction = {
-    wolfVotes:{},
-    guard:null,
-    guardUsed:null,
-    seerUsed:null
-};
+
+
+    game.nightAction={
+
+      wolfVotes:{},
+
+      guard:null,
+
+      seerUsed:null,
+
+      guardUsed:null
+
+    };
+
+
+
 
 
     broadcast(room,{
@@ -279,20 +414,28 @@ export function createGameManager(
 
       time:90,
 
+      day:game.day,
+
       players:getPublicPlayers(game)
 
     });
 
 
 
-    setTimeout(()=>{
 
-      endNight(room);
+    setTimer(
 
-    },90000);
+      room,
+
+      ()=>endNight(room),
+
+      90000
+
+    );
 
 
   }
+
 
 
 
@@ -302,64 +445,101 @@ export function createGameManager(
 
   function endNight(room){
 
-  const game = games.get(room);
-  if(!game) return;
 
-  // Đếm phiếu của sói
-  const votes = {};
+    const game =
+      games.get(room);
 
-  Object.values(game.nightAction.wolfVotes).forEach(id=>{
 
-    votes[id] = (votes[id] || 0) + 1;
 
-  });
+    if(!game)
 
-  let target = null;
-  let max = 0;
+      return;
 
-  for(const id in votes){
 
-    if(votes[id] > max){
 
-      max = votes[id];
-      target = id;
+
+    const votes={};
+
+
+
+
+    Object.values(
+      game.nightAction.wolfVotes
+    )
+    .forEach(id=>{
+
+      votes[id]=(votes[id]||0)+1;
+
+    });
+
+
+
+
+
+    let target=null;
+
+    let max=0;
+
+
+
+    for(const id in votes){
+
+      if(votes[id]>max){
+
+        max=votes[id];
+
+        target=id;
+
+      }
 
     }
 
-  }
 
-  // Nếu hòa phiếu thì không ai chết
-  const same =
-    Object.values(votes)
+
+
+    const same =
+      Object.values(votes)
       .filter(v=>v===max)
       .length;
 
-  if(same > 1){
-    target = null;
+
+
+
+    if(same>1)
+
+      target=null;
+
+
+
+
+
+    if(
+      target &&
+      target!==game.nightAction.guard
+    ){
+
+      killPlayer(
+        room,
+        target
+      );
+
+    }
+
+
+
+
+
+    if(checkWin(room))
+
+      return;
+
+
+
+    startMorning(room);
+
+
   }
-
-  // Bảo vệ
-  if(
-    target &&
-    target !== game.nightAction.guard
-  ){
-    killPlayer(room,target);
-  }
-
-  if(checkWin(room))
-    return;
-
-  startMorning(room);
-
-}
-
-
-
-
-
-
-  function startMorning(room){
-
+    function startMorning(room){
 
     const game =
       games.get(room);
@@ -382,20 +562,28 @@ export function createGameManager(
 
       time:120,
 
+      day:game.day,
+
       players:getPublicPlayers(game)
 
     });
 
 
 
-    setTimeout(()=>{
 
-      startVote(room);
+    setTimer(
 
-    },120000);
+      room,
+
+      ()=>startVote(room),
+
+      120000
+
+    );
 
 
   }
+
 
 
 
@@ -411,6 +599,7 @@ export function createGameManager(
       games.get(room);
 
 
+
     if(!game)
       return;
 
@@ -422,6 +611,7 @@ export function createGameManager(
 
 
 
+
     broadcast(room,{
 
       type:"game",
@@ -430,20 +620,29 @@ export function createGameManager(
 
       time:30,
 
+      day:game.day,
+
       players:getPublicPlayers(game)
 
     });
 
 
 
-    setTimeout(()=>{
 
-      endVote(room);
+    setTimer(
 
-    },30000);
+      room,
+
+      ()=>endVote(room),
+
+      30000
+
+    );
 
 
   }
+
+
 
 
 
@@ -456,6 +655,7 @@ export function createGameManager(
 
     const game =
       games.get(room);
+
 
 
     if(!game)
@@ -478,10 +678,12 @@ export function createGameManager(
 
 
 
+
     game.votes[uid]=target;
 
 
   }
+
 
 
 
@@ -497,8 +699,10 @@ export function createGameManager(
       games.get(room);
 
 
+
     if(!game)
       return;
+
 
 
 
@@ -506,19 +710,25 @@ export function createGameManager(
 
 
 
-    Object.values(game.votes)
+
+    Object.values(
+      game.votes
+    )
     .forEach(id=>{
 
-      result[id] =
+      result[id]=
       (result[id]||0)+1;
 
     });
 
 
 
-    let max=0;
+
 
     let dead=null;
+
+    let max=0;
+
 
 
 
@@ -547,63 +757,104 @@ export function createGameManager(
 
 
 
+
     if(same>1)
 
       dead=null;
 
 
 
+
+
     if(dead)
 
-      killPlayer(room,dead);
+      killPlayer(
+        room,
+        dead
+      );
+
 
 
 
 
     if(checkWin(room))
-  return;
+
+      return;
 
 
-startAfternoon(room);
+
+
+    startAfternoon(room);
 
 
   }
 
 
 
-function startAfternoon(room){
-
-  const game =
-    games.get(room);
 
 
-  if(!game)
-    return;
 
 
-  game.phase="afternoon";
 
 
-  broadcast(room,{
-
-    type:"game",
-
-    phase:"afternoon",
-
-    time:60,
-
-    players:getPublicPlayers(game)
-
-  });
+  function startAfternoon(room){
 
 
-  setTimeout(()=>{
+    const game =
+      games.get(room);
 
-    startNight(room);
 
-  },60000);
 
-}
+    if(!game)
+
+      return;
+
+
+
+    game.phase="afternoon";
+
+
+
+    broadcast(room,{
+
+      type:"game",
+
+      phase:"afternoon",
+
+      time:60,
+
+      day:game.day,
+
+      players:getPublicPlayers(game)
+
+    });
+
+
+
+
+    setTimer(
+
+      room,
+
+      ()=>{
+
+        game.day++;
+
+        startNight(room);
+
+      },
+
+      60000
+
+    );
+
+
+  }
+
+
+
+
+
 
 
 
@@ -617,6 +868,7 @@ function startAfternoon(room){
 
 
     if(!game)
+
       return;
 
 
@@ -628,7 +880,11 @@ function startAfternoon(room){
 
 
 
-    if(!player)
+    if(
+      !player ||
+      !player.alive
+    )
+
       return;
 
 
@@ -644,18 +900,21 @@ function startAfternoon(room){
       player:uid,
 
       faction:
-        player.role==="wolf"
-        ?
-        "wolf"
-        :
-        "villager",
+      player.role==="wolf"
+      ?
+      "wolf"
+      :
+      "villager",
+
 
       players:getPublicPlayers(game)
 
     });
 
 
+
   }
+
 
 
 
@@ -673,6 +932,7 @@ function startAfternoon(room){
 
 
     if(!game)
+
       return false;
 
 
@@ -696,33 +956,42 @@ function startAfternoon(room){
 
 
 
+
     if(wolves===0){
+
 
       endGame(
         room,
         "villager"
       );
 
+
       return true;
 
     }
 
 
 
+
+
     if(wolves>=humans){
+
 
       endGame(
         room,
         "wolf"
       );
 
+
       return true;
 
     }
 
 
 
+
     return false;
+
 
   }
 
@@ -733,7 +1002,12 @@ function startAfternoon(room){
 
 
 
+
   function endGame(room,winner){
+
+
+    clearTimer(room);
+
 
 
     broadcast(room,{
@@ -749,117 +1023,263 @@ function startAfternoon(room){
     games.delete(room);
 
 
+
+    if(setRoomState){
+
+      setRoomState(
+        room,
+        "room"
+      );
+
+    }
+
+
   }
 
 
 
-function action(room, uid, action, target){
 
-  const game = games.get(room);
-  if(!game) return;
 
-  const player = game.players.find(p => p.id === uid);
-  if(!player || !player.alive) return;
 
-  switch(action){
 
-    // 🐺 Sói bỏ phiếu cắn
-    case "kill":
 
-      if(player.role !== "wolf") return;
 
-      game.nightAction.wolfVotes[uid] = target;
+  function action(room,uid,action,target){
 
-      sendPlayer(uid,{
-        type:"info",
-        text:"🐺 Đã bỏ phiếu."
-      });
+
+    const game =
+      games.get(room);
+
+
+
+    if(!game)
+
+      return;
+
+
+
+
+    const player =
+      game.players.find(
+        p=>p.id===uid
+      );
+
+
+
+    if(
+      !player ||
+      !player.alive
+    )
+
+      return;
+
+
+
+
+
+    switch(action){
+
+
+
+      case "kill":
+
+
+        if(
+          player.role!=="wolf" ||
+          game.phase!=="night"
+        )
+
+          return;
+
+
+
+        game.nightAction.wolfVotes[uid]=target;
+
+
+
+        sendPlayer(uid,{
+
+          type:"info",
+
+          text:"🐺 Đã bỏ phiếu"
+
+        });
+
+
 
       break;
 
-    // 🔮 Tiên tri
-    case "see":
 
-  if(player.role !== "seer") return;
 
-  if(game.nightAction.seerUsed === uid){
-    sendPlayer(uid,{
-      type:"info",
-      text:"❌ Bạn đã dùng kỹ năng trong đêm này."
-    });
-    return;
+
+
+
+      case "see":
+
+
+
+        if(
+          player.role!=="seer" ||
+          game.phase!=="night"
+        )
+
+          return;
+
+
+
+
+        if(
+          game.nightAction.seerUsed===uid
+        )
+
+          return;
+
+
+
+
+        game.nightAction.seerUsed=uid;
+
+
+
+
+        const targetPlayer =
+          game.players.find(
+            p=>p.id===target
+          );
+
+
+
+        if(!targetPlayer)
+
+          return;
+
+
+
+
+        sendPlayer(uid,{
+
+          type:"see_result",
+
+          target,
+
+          faction:
+          targetPlayer.role==="wolf"
+          ?
+          "wolf"
+          :
+          "villager"
+
+        });
+
+
+
+      break;
+
+
+
+
+
+
+
+      case "guard":
+
+
+
+        if(
+          player.role!=="guard" ||
+          game.phase!=="night"
+        )
+
+          return;
+
+
+
+
+        if(
+          game.nightAction.guardUsed===uid
+        )
+
+          return;
+
+
+
+
+        game.nightAction.guardUsed=uid;
+
+        game.nightAction.guard=target;
+
+
+
+
+        sendPlayer(uid,{
+
+          type:"info",
+
+          text:"🛡️ Đã bảo vệ"
+
+        });
+
+
+
+      break;
+
+
+    }
+
+
   }
 
-  game.nightAction.seerUsed = uid;
 
-  const targetPlayer =
-    game.players.find(p => p.id === target);
 
-  if(!targetPlayer) return;
 
-  sendPlayer(uid,{
-    type:"see_result",
-    target,
-    faction:
-      targetPlayer.role==="wolf"
-        ? "wolf"
-        : "villager"
-  });
 
-  break;
 
-    // 🛡️ Bảo vệ
-    case "guard":
 
-  if(player.role !== "guard") return;
 
-  if(game.nightAction.guardUsed === uid){
-    sendPlayer(uid,{
-      type:"info",
-      text:"❌ Bạn đã dùng kỹ năng trong đêm này."
-    });
-    return;
-  }
 
-  game.nightAction.guardUsed = uid;
-  game.nightAction.guard = target;
+  function getGamesCount(){
 
-  sendPlayer(uid,{
-    type:"info",
-    text:"🛡️ Đã bảo vệ."
-  });
-
-  break;
+    return games.size;
 
   }
 
-}
 
-function getGamesCount(){
 
-  return games.size;
 
-}
 
-function getGame(room){
+
+
+
+  function getGame(room){
+
     return games.get(room);
-}
+
+  }
 
 
-return {
+
+
+
+
+
+
+  return {
+
 
     startGame,
 
     vote,
 
     checkWin,
-  
+
     action,
 
     getGamesCount,
 
     getGame
 
-};
 
-      }
+  };
+
+
+        }
