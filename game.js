@@ -1257,7 +1257,87 @@ export function createGameManager(
   }
 
 
+async function syncGame(room,uid,ws){
 
+
+// lấy dữ liệu ván đang chạy
+
+const game =
+games.get(room);
+
+
+if(!game){
+
+ws.send(JSON.stringify({
+
+type:"info",
+
+text:"Không tìm thấy trận đấu"
+
+}));
+
+return;
+
+}
+
+
+
+
+let player =
+game.players.find(
+p=>p.id===uid
+);
+
+
+
+if(!player){
+
+ws.send(JSON.stringify({
+
+type:"info",
+
+text:"Bạn không còn trong trận"
+
+}));
+
+return;
+
+}
+
+
+
+
+
+ws.send(JSON.stringify({
+
+type:"game",
+
+phase:game.phase,
+
+time:game.time,
+
+players:game.players.map(p=>({
+
+id:p.id,
+
+name:p.name,
+
+avatar:p.avatar,
+
+seat:p.seat,
+
+alive:p.alive
+
+})),
+
+maxPlayers:game.maxPlayers
+
+
+}));
+
+
+
+}
 
 
 
@@ -1276,7 +1356,9 @@ export function createGameManager(
 
     getGamesCount,
 
-    getGame
+    getGame,
+
+    syncGame
 
 
   };
