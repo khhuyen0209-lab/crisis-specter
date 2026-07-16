@@ -841,6 +841,10 @@ function getGamesCount(){
 
 }
 
+function getGame(room){
+    return games.get(room);
+}
+
 
 return {
 
@@ -852,7 +856,9 @@ return {
   
     action,
 
-    getGamesCount
+    getGamesCount,
+
+    getGame
 
 };
 
