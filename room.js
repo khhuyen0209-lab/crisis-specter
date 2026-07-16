@@ -740,17 +740,31 @@ location:"game"
 
 if(status==="waiting"){
 
+const roomData = await oldRef.get();
+
+const players = await oldRef
+.collection("players")
+.get();
+
+
 return res.json({
 
 room:oldRoom,
 
 sync:true,
 
-location:"room"
+location:"room",
+
+data:{
+    room:oldRoom,
+    ...roomData.data(),
+    players:players.docs.map(p=>({
+        id:p.id,
+        ...p.data()
+    }))
+}
 
 });
-
-}
 
 }
 
