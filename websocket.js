@@ -12,13 +12,6 @@ export const clients = new Map();
 export const playerRooms = new Map();
 
 
-// uid -> room cache
-const playerRooms = new Map();
-
-
-
-
-
 /*
 =================================
  SEND
